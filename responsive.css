@@ -1,0 +1,211 @@
+/* Layout only: image pixels, masks and scientific coordinates stay unchanged. */
+html{color-scheme:dark}
+html,body{width:100%;min-width:0;overflow:hidden}
+body>header,body>.toolbar,body>.depth,body>footer{flex-shrink:0}
+body>header{padding:8px 14px;min-width:0}
+body .toolbar{padding:6px 10px;gap:6px;max-height:25dvh;overflow:auto;align-content:start}
+body .toolbar .tbg{flex-wrap:wrap;max-width:100%;gap:5px;margin-right:0;padding-right:6px;min-width:0}
+body .toolbar button,body .toolbar select{padding:6px 9px;max-width:100%}
+body .toolbar .tbg:last-child{margin-left:auto}
+body #main,body #viewport{min-width:0;min-height:0}
+body #arbol{width:clamp(300px,var(--sidebar-width,24vw),min(45vw,700px));overflow:hidden;padding:8px;flex-shrink:0}
+body #vista{padding-right:30px;flex-shrink:0;gap:6px;align-items:center}
+body #vista label{display:flex;align-items:center;gap:6px;flex:1;min-width:0;font-size:12px;color:#98aabc}
+body #vista select{flex:1;min-width:0;background:#101b27;color:#c9d6e2;border:1px solid #344254;border-radius:5px;padding:4px 6px;min-height:28px}
+body #vista button{flex:0 0 auto;padding:4px 7px;min-height:28px;font-size:12px}
+body #vista button[hidden]{display:none}
+body #xp{padding:0;gap:6px;overflow:hidden}
+body #xp>.row,body #xpHead{flex-shrink:0;min-width:0}
+body #xp input[type=search],body #xp select,body #xp button{min-height:28px;font:inherit;border-radius:5px}
+body #xp input[type=search]{background:#0b1016;color:#c9d6e2;border:1px solid #344254;padding:4px 7px}
+body #xpSearch{flex-wrap:nowrap}
+body #xpQ{flex:1;min-width:0;width:0}
+body #xpRollo{width:100px;min-width:0}
+body #xpOrder{flex-wrap:nowrap}
+body #xpOrder label{display:flex;align-items:center;gap:5px;flex:1;min-width:0;color:#98aabc}
+body #xpOrder select{flex:1;width:0;min-width:0;color:#c9d6e2}
+body #xpControls{flex:0 1 auto;max-height:min(50dvh,390px);min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:6px}
+body #xpControls>.row{flex-shrink:0}
+body #xpPre{flex-wrap:nowrap}
+body #xpPreset{flex:1;width:0;min-width:0}
+body #xp .xpSections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;flex-shrink:0}
+body #xp .xpSections details[open]{grid-column:1/-1}
+body #xp details{flex-shrink:0;min-width:0;border:1px solid #293a4b;border-radius:6px;background:#101923}
+body #xp summary{padding:6px 8px;cursor:pointer;color:#b9cad8;font-weight:600}
+body #xp summary:hover{background:#182b3b}
+body #xpFilterCount{color:#86dcd5;font-weight:400}
+body #xp .xpFilterBody{display:flex;flex-direction:column;gap:8px;padding:2px 8px 8px}
+body #xp fieldset{border:0;padding:0;margin:0;min-width:0}
+body #xp legend{padding:0;margin-bottom:4px;color:#98aabc;font-size:11px}
+body #xp .xpFields{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:5px 8px}
+body #xp .xpFields label{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px;color:#98aabc}
+body #xp .xpFields select{width:100%;min-width:0;font-size:12px}
+body #xp .xpRanges{display:grid;gap:5px}
+body #xp .xpRanges label{display:flex;align-items:center;gap:5px;min-width:0}
+body #xp .xpRanges input{flex:0 1 64px;min-width:0;margin-left:auto;min-height:26px}
+body #xp .xpRanges input+input{margin-left:0}
+body #xp .xpChecks{gap:5px 12px;padding-top:5px}
+body #xp .xpChecks label{display:flex;align-items:center;gap:4px;min-height:28px}
+body #xpStats>.row,body #xpTally{padding:0 8px 6px}
+body #xpWarm{margin-left:auto}
+body #xpTally table{width:100%;border-collapse:collapse;font-size:11px}
+body #xpTally caption{text-align:left;color:#98aabc;padding-bottom:4px}
+body #xpTally th,body #xpTally td{text-align:right;padding:3px 2px;font-weight:400}
+body #xpTally th:first-child{text-align:left}
+body #xpTally thead{color:#98aabc;border-bottom:1px solid #293a4b}
+body #xpTally .p{color:#4ade80}body #xpTally .f{color:#f87171}body #xpTally .u{color:#95a2b3}
+body #xpActive{gap:4px}
+body #xpActive[hidden]{display:none}
+body #xp .xpBadge{min-height:24px;padding:2px 6px;background:#172534;border:1px solid #344254;color:#bdcddd;font-size:11px}
+body #xp .xpBadge.pass{border-color:#2d8a6d;color:#a3e6d3}
+body #xp .xpBadge.fail{border-color:#8a3d3d;color:#f6b9c0}
+body #xpResults{gap:2px;padding-top:4px;border-top:1px solid #293a4b}
+body #xpCount{font-size:12px;line-height:1.4;font-weight:600}
+body #xpHint{font-size:10px}
+body #xpList{flex:1 1 0;min-height:100px;overscroll-behavior:contain;scrollbar-gutter:stable}
+body #xpHead{position:static;font-family:ui-monospace,monospace}
+body #xpList{font-family:ui-monospace,monospace}
+body #arbol.xpTree #xp{flex:0 1 auto;max-height:65%;min-height:0;overflow:hidden}
+body #arbol.xpTree #tree{flex:1 1 0;min-height:100px;overscroll-behavior:contain}
+body #leyendaContam{flex-shrink:0;margin-bottom:4px}
+body #panel{width:clamp(266px,22vw,360px);max-width:100%;overscroll-behavior:contain;scrollbar-gutter:stable}
+body #panel .fila{flex-wrap:wrap}
+body #panel .fila>button{flex:1 1 85px;overflow-wrap:anywhere}
+/* The labeler keeps its original controls and handlers inside a compact inspector. */
+body #panel.labelCompact{display:flex;flex-direction:column;padding:0;overflow-x:hidden;overflow-y:auto;font-size:12px}
+body #panel[hidden]{display:none}
+body #labelHeader{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #293a4b;flex-shrink:0;position:sticky;top:0;z-index:1;background:#0e1620}
+body #labelHeader strong{font-size:13px}
+body #labelHeader button{min-width:28px;min-height:28px;padding:0;font-size:18px}
+body #labelBrush{padding:8px 10px;flex-shrink:0;border-bottom:1px solid #293a4b}
+body #labelModes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-bottom:6px}
+body #labelModes button{min-width:0;padding:5px 2px;min-height:28px;font-size:12px}
+body #labelModes button[aria-pressed=true]{outline:2px solid #c9ede7;outline-offset:-2px}
+body #panel .labelSlider{display:flex;align-items:center;gap:5px;min-height:28px;margin:2px 0;white-space:nowrap}
+body #panel .labelSlider input[type=range]{flex:1;width:0;min-width:50px;margin-left:auto}
+body #panel #htSec .labelSlider{flex-wrap:wrap;white-space:normal;font-size:11px}
+body #labelBrush>.fila{margin-top:5px}
+body #labelSections{flex:1 1 auto;min-height:80px;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:5px;padding:8px 10px}
+body #labelSections>details{flex-shrink:0;border:1px solid #293a4b;border-radius:6px;background:#101923;min-width:0}
+body #labelSections summary{padding:6px 8px;cursor:pointer;color:#b9cad8;font-weight:600}
+body #labelSections summary:hover{background:#182b3b}
+body #panel .labelBody{padding:2px 8px 8px;min-width:0}
+body #panel .labelBody>.fila{margin:4px 0}
+body #panel .labelBody>button{width:100%;margin:4px 0}
+body #panel .fila>button{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3;min-height:28px}
+body #panel h3{margin:6px 0 4px;font-size:11px;text-transform:none;letter-spacing:0}
+body #panel select{max-width:100%;min-width:0;background:#0b1016;color:#c9d6e2;border:1px solid #344254;border-radius:5px;padding:4px;min-height:28px;font-size:12px}
+body #panel .labelFormat{display:flex;flex-direction:column;gap:4px;color:#98aabc;margin:4px 0}
+body #panel #impFormato{width:100%}
+body #panel #labelJson{margin-top:6px;border-top:1px solid #293a4b}
+body #panel #labelJson>.labelBody{padding:0}
+body #panel textarea{width:100%;height:64px;min-height:40px;resize:vertical;box-sizing:border-box}
+body #panel .htChk,body #panel .gmChk{font-size:11px;line-height:1.4;margin:5px 0}
+body #panel .capaRow{display:flex;align-items:center;gap:5px;margin:4px 0;min-width:0}
+body #panel .capaRow span{min-width:0;flex:1}
+body #panel .capaRow input[type=range]{width:80px;min-width:45px;flex:1}
+body #panel #etiqColores{flex-wrap:wrap;gap:5px 8px;margin-top:6px}
+body #panel #etiqColores label{display:flex;align-items:center;gap:4px;font-size:11px;margin:0}
+body #panel #htPend,body #labelWarnings{flex-shrink:0;padding:6px 10px;margin:0!important;font-size:11px;line-height:1.4;color:#e0913c;white-space:pre-line;border-bottom:1px solid #293a4b;max-height:22dvh;overflow:auto}
+body #labelFooter{flex-shrink:0;border-top:1px solid #293a4b;background:#101c29;padding:6px 10px;position:sticky;bottom:0;z-index:1}
+body #labelFooter small{display:block;font-size:10px;color:#98aabc;margin-top:4px}
+body #panel #labelStatus{max-height:20dvh;overflow:auto;overflow-wrap:anywhere;font-size:11px;line-height:1.4}
+body #labelStatus>div:empty{display:none}
+body #panel #stats{font:11px ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+body #filtros{position:fixed;z-index:30;top:var(--toolbar-bottom,120px);left:8px;right:8px;max-height:calc(100dvh - var(--toolbar-bottom,120px) - 120px);overflow:auto;overscroll-behavior:contain;align-content:start;border:1px solid #405064;border-radius:8px;box-shadow:0 12px 30px #000b;padding:12px}
+body #filtros label{max-width:100%;flex-wrap:wrap}
+body #filtros .sep{display:none}
+body #filtros #fxDestino{flex-basis:100%;min-width:0}
+body #filtros #fxDestino small{overflow-wrap:anywhere}
+body #fxClose{margin-left:auto;position:sticky;top:0;z-index:3}
+body.ui-simple #filtros>#fxClose{display:block!important}
+body #contamAviso,body #orientAviso{max-height:56px;overflow:auto;flex-shrink:0}
+body .depth{grid-template-columns:auto auto minmax(80px,1fr) auto auto auto minmax(0,auto);gap:8px;padding:8px 12px}
+body .depth .vsel{min-width:0}
+body .mods{min-width:0}
+body .mods>summary{max-width:clamp(150px,22vw,420px)}
+body #modsList{bottom:var(--models-bottom,80px);max-height:var(--models-height,60dvh);width:min(420px,calc(100vw - 24px))}
+body #bandasCfg{max-height:22dvh;overflow:auto;flex-shrink:0}
+body footer{padding:2px 12px 8px;min-width:0}
+body #title{min-width:0;max-width:none;flex:1}
+body #help{flex-shrink:0}
+body #superBar{flex-wrap:wrap;max-height:30dvh;overflow:auto;gap:6px 10px;min-width:0}
+body #superBar label{display:flex;align-items:center;gap:5px;flex-wrap:wrap;max-width:100%}
+body #superBar input{min-width:60px;max-width:35vw}
+body #superGrid{min-height:0;overscroll-behavior:contain}
+body #superMenu{width:max-content;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto}
+@media(min-width:2200px){body{font-size:15px}body #arbol{width:clamp(380px,var(--sidebar-width,20vw),640px)}body #xp{font-size:13px}body #panel{font-size:14px}}
+@media(max-width:1100px){
+ body .depth{grid-template-columns:auto auto minmax(60px,1fr) auto auto}
+ body #bandasBtn{grid-row:2;grid-column:1/3}
+ body .depth .vsel{grid-row:2;grid-column:3/-1;justify-content:flex-end}
+ body .mods>summary{max-width:min(50vw,360px)}
+ body #help{display:none}
+}
+@media(max-width:900px){
+ body #arbol{position:absolute;inset:0 auto 0 0;z-index:7;height:100%;width:min(var(--sidebar-width,360px),calc(100vw - 24px));box-shadow:8px 0 24px #0008}
+ body #tirador{display:none}
+ body .toolbar .tbg{border:0;padding-right:0}
+ body .toolbar .tbg:last-child{margin-left:0}
+ body #panel{width:min(320px,100%)}
+}
+@media(max-width:500px){
+ body>header{padding:5px 8px;font-size:12px}
+ body #count{font-size:10px}
+ body .toolbar{gap:4px;max-height:25dvh;padding:5px 6px}
+ body .toolbar button,body .toolbar select{font-size:12px;padding:5px 7px}
+ body .toolbar .tbl{display:none}
+ body #zoom{min-width:42px}
+ body .depth{padding:6px;gap:5px;font-size:12px}
+ body .depth>.muted{font-size:10px;max-width:48px}
+ body .depth select{max-width:110px}
+ body .mods>summary{padding:6px;max-width:45vw}
+ body #xpControls{max-height:45dvh}
+}
+
+/* Filter box organization; selectors deliberately stay inside this panel. */
+body #filtros{display:block;padding:0;max-height:min(45dvh,calc(100dvh - var(--toolbar-bottom,120px) - 100px))}
+body #filtros[hidden]{display:none}
+body #filtros #fxHeader{position:sticky;top:0;z-index:4;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:6px 10px;background:#101c29;border-bottom:1px solid #344254}
+body #filtros #fxHeader strong{font-size:13px;margin-right:2px}
+body #filtros #fxHeader .fxSource{gap:6px}
+body #filtros #fxHeader #contrast{width:auto;max-width:100%}
+body #filtros #fxClose{position:static;margin-left:auto;white-space:nowrap}
+body #filtros #uiModo{flex-shrink:0;border-radius:6px}
+body #filtros button,body #filtros select{min-height:28px}
+body #filtros #uiModo button{padding:4px 8px}
+body #filtros #fxPresetSection{display:flex;min-width:0}
+body #filtros #fxPresetSelect{width:160px;max-width:100%}
+body #filtros #fxPresets{display:none}
+body #filtros #fxAdvanced{display:block;padding:0}
+body #filtros #fxTabs{display:flex;gap:4px;padding:5px 10px 0;overflow-x:auto}
+body #filtros #fxTabs button{border-color:transparent;background:transparent;white-space:nowrap;color:#98aabc}
+body #filtros #fxTabs button[aria-selected=true]{border-color:#405064;background:#182b3b;color:#e6edf5}
+body #filtros .fxCard{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:4px 16px;min-width:0;padding:6px 10px 8px}
+body #filtros .fxCard[hidden]{display:none}
+body #filtros .fxCard label{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;margin:0;white-space:normal;min-width:0;min-height:28px}
+body #filtros .fxCard .fxWide{grid-column:span 2}
+body #filtros .fxCard input[type=range]{width:80px;flex:1 1 60px;min-width:30px;max-width:100%}
+body #filtros .fxCard output{flex:0 0 32px;min-width:0;text-align:right}
+body #filtros .fxCard select{margin-left:auto;min-width:0;max-width:100%}
+body #filtros #fxHist{display:block;align-self:center;width:100%;max-width:256px;height:24px;margin:0}
+body #filtros #fBlink{justify-self:start;align-self:center}
+body #filtros #fxSimple{padding:8px 10px;gap:6px}
+body #filtros #fxBar{padding:5px 10px;margin:0!important;gap:6px;flex-wrap:wrap;border-top:1px solid #263342;font-size:12px}
+body #filtros #fxFavs{display:flex;flex-wrap:wrap;gap:4px}
+body #filtros #fEstado{margin-left:auto;text-align:right;font-size:10px}
+@media(max-width:600px){
+ body #filtros #fxHeader{gap:6px}
+ body #filtros #fxHeader .fxSource{order:1;flex-basis:100%}
+ body #filtros #fxHeader #contrast{min-width:0;flex:1}
+ body #filtros #fxPresetSection{order:2;flex:1}
+ body #filtros #fxPresetSelect{width:100%}
+ body #filtros #fReset{order:2}
+ body #filtros #fxClose{font-size:0}
+ body #filtros #fxClose::after{content:'×';font-size:18px}
+ body #filtros button,body #filtros select{min-height:34px}
+ body #filtros .fxCard{grid-template-columns:1fr;gap:2px}
+ body #filtros .fxCard label{min-height:32px}
+ body #filtros .fxCard .fxWide{grid-column:auto}
+ body #filtros #fxBar>span:first-child{display:none}
+}

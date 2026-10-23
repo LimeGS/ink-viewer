@@ -1,0 +1,20 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Máscaras del catálogo</title><style>body{font:16px system-ui;background:#111820;color:#eee;margin:24px}a{color:#8cd5ff}input,select,button{font:inherit;padding:8px;margin:4px}article{border-top:1px solid #52606b;padding:16px 0}small{display:block;color:#bec8cf;overflow-wrap:anywhere}figure{display:inline-block;max-width:45%;margin:8px}img{max-width:100%;max-height:70vh;object-fit:contain;background:#333}#images{position:sticky;top:0;background:#111820}label{display:inline-block}#status{margin:12px 0}</style>
+<h1>Máscaras del catálogo</h1><p>Originales y versiones conservadas. La vista de cada archivo no certifica su alineación para superponerlo o entrenar.</p>
+<label>Rollo <select id="roll"><option>PHerc1447</option><option>PHerc0306B</option></select></label>
+<label>Superficie, serie o profundidad <input id="search" type="search"></label><button id="find">Buscar</button>
+<p><a href="canonical_ink9um.html">Ver las 24 familias ink_9um y sus profundidades</a></p><div id="status"></div><div id="images"></div><div id="rows"></div><button id="more">Ver más</button>
+<script>
+let offset=0;const $=id=>document.getElementById(id);
+async function load(reset=false){if(reset){offset=0;$('rows').replaceChildren();$('images').replaceChildren()}
+ const q=new URLSearchParams({rollo:$('roll').value,q:$('search').value,offset:String(offset)});
+ try{const response=await fetch('/api/mascaras-canonicas?'+q);if(!response.ok)throw Error('HTTP '+response.status);const data=await response.json();
+ $('status').textContent=data.total+' registros coincidentes. Sólo se leen archivos del catálogo canónico.';
+ for(const r of data.records){const a=document.createElement('article');const title=document.createElement('strong');title.textContent=(r.segment||r.declared_surface||'Superficie pendiente')+' · profundidad '+(r.depth??r.depth_declared??'pendiente');a.append(title);
+ const info=document.createElement('small');info.textContent=r.series+' · '+r.type+' · '+r.association+' · '+r.id;a.append(info);
+ for(const x of r.assets){const link=document.createElement('a');link.href=x.url;link.target='_blank';link.textContent=' Abrir '+x.role+' ';a.append(link)}
+ const button=document.createElement('button');button.textContent='Ver archivos';button.onclick=async()=>{$('images').replaceChildren();try{for(const x of r.assets){let frames=1;const tif=['.tif','.tiff'].includes(x.format);if(tif){const response=await fetch(x.url+'?metadata=1');if(!response.ok)throw Error('HTTP '+response.status);frames=(await response.json()).frames}for(let frame=0;frame<frames;frame++){const box=document.createElement('figure'),caption=document.createElement('figcaption'),img=document.createElement('img');caption.textContent=x.role+(tif?' · página TIFF '+frame+' (no implica profundidad)':'');img.alt=caption.textContent;img.src=x.url+(tif?'?preview=1&frame='+frame:'');img.onerror=()=>{$('status').textContent='Error al cargar '+caption.textContent};box.append(caption,img);$('images').append(box)}}}catch(e){$('status').textContent='No se pudo abrir: '+e.message}};a.append(button);$('rows').append(a)}
+ offset+=data.records.length;$('more').hidden=offset>=data.total;
+ }catch(e){$('status').textContent='No se pudo leer el inventario: '+e.message}}
+$('find').onclick=()=>load(true);$('roll').onchange=()=>load(true);$('more').onclick=()=>load();load(true);
+</script></html>

@@ -1,0 +1,14 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Máscaras ink_9um</title>
+<style>body{font:16px system-ui;background:#111820;color:#eee;margin:24px}a{color:#8cd5ff}select,input{font:inherit;padding:8px}img{max-width:95%;max-height:70vh;background:#333}figure{display:inline-block;margin:10px;max-width:45%}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style>
+<h1>Máscaras ink_9um del catálogo</h1><a href="canonical_masks.html">Volver a máscaras 1447 / 306B</a>
+<p>24 familias alineadas · 51 Zarr originales. Vistas reducidas al máximo de cada bloque de 8 × 8 píxeles; profundidad Z nativa. Estas vistas son derivados para inspección, no etiquetas para entrenamiento.</p>
+<label>Familia <select id="family"></select></label> <label>Plano Z <input id="z" type="number" value="10" min="0" max="20"></label><p id="status"></p><div id="images"></div><pre id="provenance"></pre>
+<script>
+const $=id=>document.getElementById(id);let records=[];
+function show(){const rows=records.filter(r=>r.family===$('family').value);const z=Number($('z').value);$('images').replaceChildren();$('provenance').textContent='';if(!Number.isInteger(z)||z<0||z>20){$('status').textContent='Elegí un plano entre 0 y 20';return}
+ $('status').textContent=rows[0].canonical_public_segment_key+' · Z '+z+' · plano anotado '+rows[0].annotation_z;
+ for(const r of rows){const f=document.createElement('figure'),cap=document.createElement('figcaption'),img=document.createElement('img');cap.textContent=r.kind;img.alt=r.kind+' Z '+z;img.src='/api/mascaras-zarr/'+encodeURIComponent(r.id)+'/'+z;img.onerror=()=>{$('status').textContent='Error al cargar una máscara; revisar integridad o conexión'};f.append(cap,img);$('images').append(f);$('provenance').textContent+=r.kind+'\n'+r.canonical+'\nManifiesto SHA256: '+r.manifest_sha256+'\n\n'}
+ const url=new URL(location.href);url.searchParams.set('family',$('family').value);url.searchParams.set('z',z);history.replaceState(null,'',url);
+}
+fetch('/api/mascaras-zarr').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(d=>{records=d.records;for(const family of [...new Set(records.map(r=>r.family))]){const o=document.createElement('option');o.value=family;o.textContent=family;$('family').append(o)}const q=new URLSearchParams(location.search);if([...$('family').options].some(o=>o.value===q.get('family')))$('family').value=q.get('family');if(q.has('z'))$('z').value=q.get('z');show()}).catch(e=>{$('status').textContent='No se pudo cargar el catálogo: '+e.message});$('family').onchange=show;$('z').onchange=show;
+</script></html>
