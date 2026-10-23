@@ -23,7 +23,8 @@ This repository contains the application and tests. Bring your own maps and data
 - [Managed releases, previews and rollback](#managed-releases-previews-and-rollback)
 - [Annotation formats and integrity](#annotation-formats-and-integrity)
 - [Troubleshooting](#troubleshooting)
-- [Development and contribution](#development-and-contribution)
+- [Security](#security)
+- [Contributing](#contributing)
 - [Licenses](#licenses)
 
 ## What you can do
@@ -317,11 +318,7 @@ sudo journalctl -u ink-viewer -n 50
 
 The SSH tunnel remains the access method. On macOS, the foreground quick start works directly; a persistent service can be managed by your own process supervisor.
 
-### Sharing and application boundaries
-
-This is a tool for a trusted operator, not a multi-user hosting service: it has no user accounts, per-user data permissions or collaborative edit conflict resolution. The source picker acts with the server account's filesystem and storage permissions. Keep access private through SSH or another access-controlled deployment.
-
-A public reverse proxy needs an authentication/access policy and deliberate handling of the application's Host and Origin checks. Merely exposing the loopback port or adding HTTPS does not provide those features. A static S3 website alone cannot host the complete application: the Python API is required for source access and validated server saves.
+See [Security](#security) before sharing access. A static S3 website alone cannot host the complete application: the Python API is required for source access and validated server saves.
 
 ## Managed releases, previews and rollback
 
@@ -387,9 +384,28 @@ Back up the complete external annotation directory. Source data, physical metada
 
 Use `ink-viewer --help`, `ink-viewer-manifest --help` and `ink-viewer-deploy --help` for all current options. Source-mode logs are written next to the selected config as `visor.log`; managed deployment logs live under `<deployment>/state/<channel>/`.
 
-## Development and contribution
+## Security
 
-Contributions are welcome through [issues](https://github.com/LimeGS/ink-viewer/issues) and pull requests. For a bug report, include the expected/actual behaviour, OS, Python/Node/browser versions, steps to reproduce, and a small synthetic fixture when possible. Redact credentials, private URLs, tokens and unpublished research data.
+### Deployment and data access
+
+Ink Viewer assumes a trusted operator. It has no user accounts, per-user authorization or collaborative write isolation. The source picker can read local files and request remote URLs using the server account's permissions. Access to the application therefore grants more than access to the currently selected dataset.
+
+- Keep the listener on loopback and use the documented SSH tunnel. A shared/public deployment needs an access-control layer and integration with the existing Host and Origin checks; HTTPS alone is not authentication.
+- Run under a dedicated, unprivileged account with access only to the required data and annotation directories. Use read-only storage credentials for browsing; local annotation saves do not require source-bucket write permission.
+- Keep credentials in the SDK's credential mechanisms, outside Git and browser code. Do not put keys in source URLs, config JSON, screenshots or reports. Review logs and dataset paths before sharing them.
+- Back up external annotations and retain original data. Grid validation and atomic pair saves reduce annotation mistakes; they do not replace backups or establish scientific correctness.
+
+The dependency audit runs on pushes and pull requests. A passing badge means the configured tools found no known dependency advisories at that time; it does not certify that application code or a deployment is vulnerability-free. Re-run the [documented checks](#run-checks) when updating dependencies.
+
+### Report a vulnerability
+
+Use **Report a vulnerability** on the repository's [Security tab](https://github.com/LimeGS/ink-viewer/security) if private reporting is available. If that option is unavailable, open a minimal issue asking the maintainers for a private reporting channel, without disclosing exploit steps or sensitive data publicly.
+
+In the private report, include the affected version or commit, deployment context, expected and actual behaviour, impact, and a minimal reproduction using synthetic data. Redact credentials and private dataset details. Test only systems you own or are authorized to assess, and coordinate disclosure with the maintainers before publishing technical details.
+
+## Contributing
+
+Bug fixes, features, documentation and synthetic test fixtures are welcome through [issues](https://github.com/LimeGS/ink-viewer/issues) and pull requests. For ordinary bug reports, include the expected/actual behaviour, OS, Python/Node/browser versions, steps to reproduce, and a small synthetic fixture when possible. Redact credentials, private URLs, tokens and unpublished research data. Use the [security reporting process](#report-a-vulnerability) for suspected vulnerabilities.
 
 ### Set up a development checkout
 
@@ -441,11 +457,13 @@ npm audit --audit-level=low
 
 For a faster test run without coverage, use `python -m unittest discover -s tests/python -p 'test_*.py'` and `npm test`.
 
-CI enforces **at least 90% line coverage separately for the complete Python package and all browser JavaScript files**, including unexecuted modules. This is not a 90% branch-coverage claim. Reports are available from the workflow's artifacts. The audit badge reports known dependency advisories found by `pip-audit` and `npm audit`; it is not a full code-security certification.
+CI enforces **at least 90% line coverage separately for the complete Python package and all browser JavaScript files**, including unexecuted modules. This is not a 90% branch-coverage claim. Reports are available from the workflow's artifacts.
 
 Tests use temporary datasets, local HTTP stand-ins and a simulated browser DOM with canvas/image replacements. For UI changes, also check a real browser with a small dataset: image loading, source switching, depth/model navigation, annotation import/export and save/reload where applicable. Unit coverage does not establish visual correctness, scientific quality or performance on your full dataset.
 
-Before submitting a pull request, explain the problem, resulting behaviour and validation. Add meaningful tests for changed behaviour, keep both coverage gates passing, and include screenshots for visible changes. Do not commit real dataset files, generated reports or credentials. Documentation corrections are welcome without adding implementation-mirroring tests.
+### Submit a pull request
+
+For substantial changes, discuss the proposed scope in an issue first. Work in a branch on your fork and open a pull request against `main`. Explain the problem, resulting behaviour and validation. Add meaningful tests for changed behaviour, keep both coverage gates passing, and include screenshots for visible changes. Do not commit real dataset files, generated reports or credentials. Documentation corrections are welcome without adding implementation-mirroring tests.
 
 ## Licenses
 
