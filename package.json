@@ -1,0 +1,8 @@
+{
+  "name": "ink-viewer-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/javascript/test_*.cjs"
+  },
+  "engines": {"node": ">=22"}
+}

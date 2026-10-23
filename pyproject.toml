@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ink-viewer"
+version = "0.1.0"
+description = "Viewer and annotator for Vesuvius ink maps"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["boto3", "Pillow"]
+
+[project.scripts]
+ink-viewer = "ink_viewer.server.s3cache_proxy:main"
+ink-viewer-deploy = "ink_viewer.deployment.viewerctl:main"
+ink-viewer-publish = "ink_viewer.deployment.publish_preview:main"
+ink-viewer-vast = "ink_viewer.deployment.vast_ctl:main"
+ink-viewer-manifest = "ink_viewer.catalog.generar_manifest:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ink_viewer = ["web/*.html", "web/pages/*.html", "web/js/*.js", "web/css/*.css", "web/fonts/*.woff2", "web/images/*.webp"]

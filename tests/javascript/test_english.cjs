@@ -1,0 +1,16 @@
+const {read, root} = require('./source.cjs');
+const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
+const vm=require('node:vm'),context=vm.createContext({window:{}});
+vm.runInContext(read('origen.js').split(' window.visorPuedeGuardar')[0]+'})();',context);
+assert.equal(context.window.visorTexto('La carpeta local no existe'),'The local folder does not exist');
+assert.equal(context.window.visorTexto('Origen de solo lectura: configura una carpeta de anotaciones'),'Read-only source: configure an annotation folder');
+assert.match(read('index.html'),/lang="en"/);
+assert.match(read('origen.js'),/Change source/);
+assert.match(read('etiq_herramientas.js'),/Value tools/);
+assert.match(read('guias_medicion.js'),/Lines and measurements/);
+assert.match(read('etiq_herramientas.js'),/the grid cannot be verified|grid cannot be verified/);
+assert.match(read('etiq_herramientas.js'),/CFG\.alcance==='conectada'/);
+assert.match(read('etiq_herramientas.js'),/HERR==='varita'/);
+assert.match(read('viewer.js'),/v==='sin certificar'/);
+for(const n of ['origen.js','etiq_herramientas.js','guias_medicion.js'])assert.doesNotMatch(read(n),/textContent=['"](?:Cambiar origen|herramientas por valor|renglones y medición|corrida de la máscara)/);
+console.log('PASS: English UI labels, compatibility warnings and unchanged internal state values');

@@ -26,3 +26,6 @@ site.json
 origin.json
 readonly-config.json
 RELEASE.json
+*.egg-info/
+build/
+dist/
