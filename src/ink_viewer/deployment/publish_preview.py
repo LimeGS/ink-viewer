@@ -58,7 +58,7 @@ def code_bundle(repo, commit, bundle):
                'LICENSE-Inter.txt', 'inter-17fe38ab302c7e5d.woff2', 'pyproject.toml',
                'package.json', 'package-lock.json', '.c8rc.json',
                '.github/workflows/tests.yml', '.github/workflows/audit.yml',
-               'docs/architecture.md'}
+               'docs/architecture.md', 'docs/guide.md'}
     suffixes = {'.py', '.js', '.cjs', '.css', '.html'}
     for name in sorted(paths):
         path = Path(name)

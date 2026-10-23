@@ -29,7 +29,7 @@ class Deployment(unittest.TestCase):
                 return subprocess.check_output(['git', '-C', str(repo), *args], stderr=subprocess.DEVNULL, text=True).strip()
             git('init'); git('config', 'user.email', 'test@example.invalid'); git('config', 'user.name', 'Test')
             (repo / 'index.html').write_text('viewer source')
-            for name in ('src/ink_viewer/__init__.py', 'src/ink_viewer/web/js/viewer.js', 'tests/python/test_fixture.py', '.github/workflows/tests.yml', 'docs/architecture.md', 'pyproject.toml', 'package.json', 'package-lock.json', '.c8rc.json', '.github/workflows/audit.yml'):
+            for name in ('src/ink_viewer/__init__.py', 'src/ink_viewer/web/js/viewer.js', 'tests/python/test_fixture.py', '.github/workflows/tests.yml', 'docs/architecture.md', 'docs/guide.md', 'pyproject.toml', 'package.json', 'package-lock.json', '.c8rc.json', '.github/workflows/audit.yml'):
                 (repo/name).parent.mkdir(parents=True,exist_ok=True)
                 (repo/name).write_text('source fixture')
             (repo / 'LICENSE').write_text('project license')
@@ -52,6 +52,7 @@ class Deployment(unittest.TestCase):
             subprocess.run(['git', 'clone', '-q', str(bundle), str(clone)], check=True)
             self.assertTrue((clone / 'index.html').is_file())
             self.assertTrue((clone/'src/ink_viewer/web/js/viewer.js').is_file())
+            self.assertTrue((clone/'docs/guide.md').is_file())
             self.assertEqual((clone / 'inter-17fe38ab302c7e5d.woff2').read_bytes(), b'font fixture')
             self.assertTrue((clone / 'LICENSE-Inter.txt').is_file())
             self.assertFalse((clone / 'local-config.json').exists())
