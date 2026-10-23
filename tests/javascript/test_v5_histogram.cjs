@@ -1,4 +1,4 @@
-const {read, root} = require('./source.cjs');
+const {read, root, sourcePath} = require('./source.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -18,7 +18,7 @@ const context = {
   LEG: {},
   group: {id: 'catalog_opaque_hash', catalogMeta: {lam: 'sheet--rev-123', modelo: 'base'}, frames: {'-2':'a','0':'b','2':'c'}},
 };
-vm.runInNewContext(read('hist_v5.js'), context);
+vm.runInNewContext(read('hist_v5.js'), context,{filename:sourcePath('hist_v5.js')});
 const bar = elements.depthWrap.children[0];
 assert.deepEqual(bar.children.map(item => item.title), ['c-2 · no score','c0 · no score','c+2 · no score']);
 context.LEG['sheet--rev-123'] = {max: 0.9, por_modelo: {

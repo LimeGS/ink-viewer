@@ -1,4 +1,4 @@
-const {read, root} = require('./source.cjs');
+const {read, root, sourcePath} = require('./source.cjs');
 // Run with: node tests/javascript/test_mask_export.cjs
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=read('viewer.js');
@@ -114,7 +114,7 @@ function checkHD(){
  get('chkMapa').checked=true;get('mapOp').value=1;
  vm.runInContext(section('window.annotationImageReady=', '\n/* ===== orientacion'),ctx);
  vm.runInContext(section('function show(reset=false)', '\n/* multi-rollo'),ctx);
- vm.runInContext(read('hd.js'),ctx);
+ vm.runInContext(read('hd.js'),ctx,{filename:sourcePath('hd.js')});
  ctx.etiqOn=true;ctx.window.requireAnnotationHD(true);
  assert.equal(ctx.window.HD,true);assert.equal(get('hdBtn').disabled,true);
  assert.equal(loaders.length,1);assert.equal(ctx.window.annotationImageReady(),false);

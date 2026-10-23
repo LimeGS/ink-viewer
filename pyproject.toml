@@ -23,3 +23,21 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 ink_viewer = ["web/*.html", "web/pages/*.html", "web/js/*.js", "web/css/*.css", "web/fonts/*.woff2", "web/images/*.webp"]
+
+[project.optional-dependencies]
+test = ["coverage[toml]>=7.10,<8", "pip-audit>=2.9,<3"]
+
+[tool.coverage.run]
+source = ["ink_viewer"]
+patch = ["subprocess"]
+relative_files = true
+parallel = true
+sigterm = true
+
+[tool.coverage.paths]
+source = ["src/ink_viewer", "*/src/ink_viewer", "*/site-packages/ink_viewer"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+precision = 2

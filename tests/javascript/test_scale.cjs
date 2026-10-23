@@ -1,11 +1,11 @@
-const {read, root} = require('./source.cjs');
+const {read, root, sourcePath} = require('./source.cjs');
 // Run: node tests/javascript/test_scale.cjs
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=read('rollo_visor.js');
 function scale(metadata){
   const context={window:{ROLLO_SERVIDOR:metadata},location:{search:'?rollo=PHercTEST'},URLSearchParams,
     XMLHttpRequest:class{open(){}send(){this.status=404}}};
-  vm.runInNewContext(source,context);
+  vm.runInNewContext(source,context,{filename:sourcePath('rollo_visor.js')});
   return context.window;
 }
 assert.equal(scale(null).VOXEL_UM,null);

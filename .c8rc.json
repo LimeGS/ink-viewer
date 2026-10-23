@@ -1,0 +1,14 @@
+{
+  "all": true,
+  "include": [
+    "src/ink_viewer/web/js/**/*.js"
+  ],
+  "reports-dir": "coverage/javascript",
+  "reporter": [
+    "text",
+    "json-summary",
+    "html"
+  ],
+  "check-coverage": true,
+  "lines": 90
+}

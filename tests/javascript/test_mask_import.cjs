@@ -1,4 +1,4 @@
-const {read, root} = require('./source.cjs');
+const {read, root, sourcePath} = require('./source.cjs');
 // Run: node tests/javascript/test_mask_import.cjs. Exercises production decoder/import code without a browser or dependencies.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -26,7 +26,7 @@ const ctx = {fetch:async()=>({ok:true,json:async()=>({canonical_masks:false})}),
   document:{querySelector:s=>elements[s] || null,createElement:t=>t==='canvas'?canvas():{setAttribute(){}}},
   createImageBitmap:async b=>({width:b.image.width,height:b.image.height,image:b.image,close(){}})};
 vm.createContext(ctx);
-vm.runInContext(core,ctx);
+vm.runInContext(core,ctx,{filename:sourcePath('etiquetar.js')});
 const capturedAutosave=ctx.autoguardar;
 vm.runInContext(tools.slice(tools.indexOf('const claveGrilla='),tools.indexOf('function verificar(')),ctx);
 vm.runInContext(tools.slice(tools.indexOf('function verificar('),tools.indexOf('/* la guardada es de una corrida HERMANA')),ctx);

@@ -1,4 +1,4 @@
-const {read, root} = require('./source.cjs');
+const {read, root, sourcePath} = require('./source.cjs');
 // Run: node tests/javascript/test_navigation.cjs. Exercise production navigation and cross-scroll persistence.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 
@@ -12,7 +12,7 @@ const ctx=vm.createContext({URL,URLSearchParams,location,Map,Promise,console,
  pintar:false,release(){throw Error('no active stroke')},flush(){},clearTimeout(){},mskTimer:null,mskGuardar(){},
  abrirDb:r=>Promise.resolve(r),actualizarDataset(){},actualizarBandas(){},request:2,tokenM:2});
 ctx.window=ctx;
-vm.runInContext(read('rollo_visor.js'),ctx);
+vm.runInContext(read('rollo_visor.js'),ctx,{filename:sourcePath('rollo_visor.js')});
 vm.runInContext(pick(html,'function irARollo(', 'function select('),ctx);
 assert.equal(ctx.ROLLO,'PHercA');assert.equal(ctx.VOXEL_UM,7);
 assert.equal(ctx.irARollo('PHercA','same'),false);assert.equal(location.search,'');
@@ -31,7 +31,7 @@ async function storage(){
   document:{querySelector:s=>elements[s]||null,createElement:()=>({setAttribute(){},width:1,height:1,getContext:()=>({drawImage(){}}),toBlob:f=>blobs.push(()=>f(new Blob(['pixels'])))} )},
   indexedDB:{open(name){if(!stores.has(name))stores.set(name,new Map());const map=stores.get(name),r={};queueMicrotask(()=>{r.result={transaction:()=>({objectStore:()=>({put(blob,key){map.set(key,blob);const q={};queueMicrotask(()=>q.onsuccess());return q},get(key){const q={result:map.get(key)};queueMicrotask(()=>q.onsuccess());return q}})})};r.onsuccess()});return r}},
   $(){},msg:m=>messages.push(m)});
- vm.runInContext(read('etiquetar.js'),c);
+ vm.runInContext(read('etiquetar.js'),c,{filename:sourcePath('etiquetar.js')});
  vm.runInContext("H={nombre:'same|c0',w:1,h:1,scroll:'PHercA',database:db};mask={width:1,height:1};mctx={};",c);
  c.autoguardar();vm.runInContext("window.ROLLO='PHercB';window.ROLLO_CORTO='B';db=abrirDb('B');H={nombre:'same|c0',w:1,h:1,scroll:'PHercB',database:db};",c);
  timers.shift()();blobs.shift()();await new Promise(setImmediate);

@@ -2,7 +2,15 @@
   "name": "ink-viewer-tests",
   "private": true,
   "scripts": {
-    "test": "node --test tests/javascript/test_*.cjs"
+    "test": "node --test tests/javascript/test_*.cjs",
+    "test:coverage": "c8 npm test"
   },
-  "engines": {"node": ">=22"}
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "devDependencies": {
+    "c8": "^12.0.0",
+    "fake-indexeddb": "^6.2.6",
+    "jsdom": "^30.1.3"
+  }
 }

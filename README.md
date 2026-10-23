@@ -1,5 +1,9 @@
 # Ink viewer
 
+[![Dependency audit](https://github.com/LimeGS/ink-viewer/actions/workflows/audit.yml/badge.svg?branch=main)](https://github.com/LimeGS/ink-viewer/actions/workflows/audit.yml)
+[![Coverage ≥90%](https://github.com/LimeGS/ink-viewer/actions/workflows/tests.yml/badge.svg?branch=main&label=coverage%20%E2%89%A590%25)](https://github.com/LimeGS/ink-viewer/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A browser viewer and annotator for 2D ink maps, with local, HTTP and S3 data origins. This repository contains viewer source and tests only. Maps, CT volumes, masks, dataset metadata, caches, credentials and machine settings belong outside Git.
 
 ## Repository layout
@@ -21,10 +25,10 @@ tests/
   javascript/          viewer interaction and integrity tests
 docs/architecture.md   component boundaries and development notes
 pyproject.toml         Python package, dependencies and CLI entry points
-package.json           JavaScript test command; no npm dependencies
+package.json           JavaScript test and coverage development dependencies
 ```
 
-Python 3.10+ and Node.js 22+ are required for development. Runtime Python dependencies are declared in `pyproject.toml`; Node is needed only for tests. The install includes web assets, so the application can run from an installed wheel outside the checkout. Run `python -m ink_viewer` as an alternative to `ink-viewer`. CI installs the package and runs both test suites.
+Python 3.10+ and a supported Node.js version (22.22.2+, 24.15.0+, or 26+) are required for development; CI uses Node 24. Runtime Python dependencies are declared in `pyproject.toml`; Node is needed only for tests. The install includes web assets, so the application can run from an installed wheel outside the checkout. Run `python -m ink_viewer` as an alternative to `ink-viewer`. CI installs the package and runs both test suites with coverage gates.
 
 ## Run
 
@@ -100,14 +104,23 @@ Training must use both mask layers to distinguish reviewed non-ink from IGNORE a
 
 ## Checks
 
-After installing the package in the activated virtual environment:
+In the activated virtual environment:
 
 ```sh
-python -m unittest discover -s tests/python -p 'test_*.py'
-npm test
+python -m pip install -e '.[test]'
+npm ci
+python -m coverage erase
+python -m coverage run -m unittest discover -s tests/python -p 'test_*.py'
+python -m coverage combine
+python -m coverage report
+npm run test:coverage
 ```
 
-Tests use temporary datasets and local service stand-ins. Browser PNG decoding and a deployment write/read check are separate verification steps. `exportar_compuertas.py` imports existing receipts into viewer gate metadata; it does not run scientific controls.
+CI requires at least **90% line coverage separately for the complete Python package and all browser JavaScript files**, including files not loaded by a test. This is a line coverage target, not a claim of 90% branch coverage. The coverage badge links to this enforced workflow; downloadable reports include Python JSON/XML and JavaScript HTML/JSON summaries.
+
+Tests use temporary datasets, local service stand-ins and a simulated browser DOM with canvas and image APIs replaced for unit tests. They cover annotation ownership, grid provenance, mask import/export, undo, navigation, filters, catalog construction and deployment guards. Real-browser PNG decoding, visual rendering and a deployment write/read check remain separate verification steps. `exportar_compuertas.py` imports existing receipts into viewer gate metadata; it does not run scientific controls.
+
+The dependency audit checks Python runtime dependencies with `pip-audit . --strict` and the npm development dependency tree with `npm audit --audit-level=low` on every push and pull request. A passing audit means no known advisories were found by those tools; it is not a complete code security review.
 
 ## Managed releases and previews
 

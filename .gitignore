@@ -29,3 +29,9 @@ RELEASE.json
 *.egg-info/
 build/
 dist/
+
+# Local coverage reports
+.coverage
+.coverage.*
+coverage/
+htmlcov/
