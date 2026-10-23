@@ -4,9 +4,9 @@ The application is a Python package with a server-rendered entry page and browse
 
 ## Component boundaries
 
-- `server`: HTTP routing, data-source access, canonical mask validation and the read-only Vast adapter. It serves source assets from `web`, independently of the selected dataset.
+- `server`: HTTP routing, data-source access, canonical mask validation and the read-only catalog adapter. It serves source assets from `web`, independently of the selected dataset.
 - `catalog`: filename conventions, inventory discovery, generated manifests, existing measured v5 scores and imported scientific gates. Generated indexes live at the selected dataset or deployment, outside the code checkout.
-- `deployment`: immutable Git releases, preview isolation, promotion/rollback and the existing Vast process controller. It operates on explicit deployment directories and preserves machine-owned settings and data.
+- `deployment`: immutable Git releases, preview isolation, promotion/rollback and catalog process management. It operates on explicit deployment directories and preserves machine-owned settings and data.
 - `web`: markup, styles, browser behavior and bundled branding. `js/viewer.js` contains the main viewer logic previously embedded in the HTML; the remaining UI tools retain their original modules and execution order.
 
 `paths.py` owns static asset and release locations. Imports use the `ink_viewer` namespace. Runtime data, annotations, caches, credentials and machine profiles do not belong in `src`.
@@ -23,4 +23,4 @@ Install with `python -m pip install -e .` in a virtual environment. Use `ink-vie
 
 Source releases are complete Git archives, including `src` and package metadata. The release manager also recognizes flat immutable releases, preserving existing rollback targets. New child processes load the selected release's `src` directory explicitly rather than the development checkout. Preview publication checks the full selected Git history against source-only paths, including the old flat layout for existing history. Deployment commands require a source checkout; installing the runtime wheel does not create a Git repository.
 
-The GitHub workflow installs the distributable package before testing, exercising package imports and installed static assets. A development change should pass both suites and a local browser check before deployment. Reorganizing this repository does not migrate the running Vast service or its external SSH launcher automatically.
+The GitHub workflow installs the distributable package before testing, exercising package imports and installed static assets. A development change should pass both suites and a local browser check before deployment. Reorganizing this repository does not migrate an existing running service or its external SSH launcher automatically.
