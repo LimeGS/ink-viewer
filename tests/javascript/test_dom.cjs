@@ -99,7 +99,7 @@ test('filters, source dialog and Super mosaic retain usable UI state',async()=>{
 test('annotation tools open on the native grid and undo remains available',async()=>{
  const {dom,w,context,errors}=await viewer();
  try{
-  click(w,'etiq');await settle();
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
   assert.equal(vm.runInContext('H.w',context),8);assert.equal(vm.runInContext('H.h',context),4);assert(w.annotationImageReady());
   for(const id of ['mTinta','mNo','mBorrar','mRegion','htVarita','htMarcar','htQuitar'])click(w,id);
   for(const id of ['htTol','htTb','htTa','htBajo','htAlto'])input(w,id,'1');
@@ -108,7 +108,7 @@ test('annotation tools open on the native grid and undo remains available',async
   input(w,'sz','3');input(w,'mkOp','0.5');input(w,'mapOp','0.5');
   for(const id of ['gmLineas','gmMedir','gmParalela','gmBorrarSel','gmCopiar','gmPegar','gmBorrarL','gmBorrarM'])click(w,id);
   click(w,'colReset');click(w,'verPng');click(w,'exp');
-  click(w,'etiq');await settle();
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
   assert.deepEqual(errors,[]);
  }finally{dom.window.close()}
 });
@@ -123,7 +123,7 @@ function dragGrid(app,x0,y0,x1,y1){pointer(app,'pointerdown',x0,y0);pointer(app,
 test('brush history, mask JSON and guide geometry use the original grid',async()=>{
  const app=await viewer(),{w,context,dom,errors}=app;
  try{
-  click(w,'etiq');await settle();assert(w.annotationImageReady());
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());assert(w.annotationImageReady());
   for(const id of ['mTinta','mNo','mBorrar']){click(w,id);dragGrid(app,1,1,4,2)}
   assert(vm.runInContext('undoS.length',context)>0);
   click(w,'undo');assert(vm.runInContext('redoS.length',context)>0);click(w,'redo');
@@ -187,7 +187,7 @@ test('model comparison pins panels, applies filters and preserves measured depth
 test('value selections, supervised regions and clipboard export keep annotation ownership',async()=>{
  const app=await viewer({writable:true}),{w,context,dom,errors}=app;
  try{
-  click(w,'etiq');await settle();assert(w.annotationImageReady());
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());assert(w.annotationImageReady());
   click(w,'mRegion');dragGrid(app,0,0,7,3);click(w,'undo');click(w,'redo');
   click(w,'mTinta');click(w,'htMarcar');dragGrid(app,0,0,7,3);
   assert(w.document.getElementById('htZona'));
@@ -226,7 +226,7 @@ test('base filters remain available when optional advanced filters are absent',a
 test('PNG provenance round trips and blocks mismatched native dimensions',async()=>{
  const {dom,w,context,errors}=await viewer({writable:true});
  try{
-  click(w,'etiq');await settle();
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
   const canvas=w.document.getElementById('mask');
   const blob=await new Promise(resolve=>canvas.toBlob(resolve));
   const info=w.mascaraCorridaInfo(null,8,4);
@@ -255,7 +255,7 @@ test('legacy browser masks migrate by matching grid without overwriting original
   const idb=vm.runInContext('idb',context);
   for(const depth of ['0','2'])await idb('readwrite',s=>s.put(blob,'fixture-run|c'+depth));
   vm.runInContext("ORI=Object.fromEntries(manifest.map(g=>[g.id,[0,0,0,'direct']]));manifest.forEach(g=>{g.meshAssociation.meshSha256='fixture-mesh';g.renderGrid={grid_id:'fixture-grid'}})",context);
-  w.reclavar();click(w,'etiq');await new Promise(resolve=>setTimeout(resolve,100));
+  w.reclavar();click(w,'etiq');await waitFor(()=>w.annotationImageReady());
   const name=vm.runInContext('H.nombre',context);assert.notEqual(name,'fixture-run|c0');assert(name.includes('8x4'));
   const original=await idb('readonly',s=>s.get('fixture-run|c0'));assert.equal(original.size,blob.size);
   const migration=JSON.parse(w.localStorage.getItem(w.visorKey('vesuvius.lienzos.migrados.v1'))||'{}');
@@ -276,7 +276,7 @@ test('pan, zoom, deep links and mask stamps preserve selected depth',async()=>{
   for(const key of ['ArrowRight','ArrowLeft','f','+','-'])w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key,bubbles:true}));
   assert.equal(w.document.getElementById('depth').value,'0');
   w.history.replaceState(null,'','#id=fixture-run&centro=2&etiq=1&paneles=Inferno,Invertido');
-  assert.equal(w.applyHash(),true);await settle();assert.equal(w.document.getElementById('depth').value,'2');
+  assert.equal(w.applyHash(),true);await waitFor(()=>w.annotationImageReady());assert.equal(w.document.getElementById('depth').value,'2');
   assert(w.annotationImageReady());
   const c=w.document.getElementById('mask'),ctx=c.getContext('2d'),data=ctx.createImageData(8,4);data.data.set([60,220,90,255]);ctx.putImageData(data,0,0);
   w.mskGuardar();assert.equal(w.mskPorLamina('s').length,1);
@@ -306,7 +306,7 @@ test('legacy automatic mask runs block untouched, wrong-grid and detached-owner 
  const app=await viewer({legacy:true}),{dom,w,context,errors}=app;
  try{
   assert.deepEqual(Array.from(w.ETIQ2509.corridas),['fixture-run']);
-  click(w,'etiq');await settle();
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
   const name=vm.runInContext('H.nombre',context);assert.equal(name,'s__vc3d_lectura|c0');
   const url='/api/mascara/s__vc3d_lectura/s.png?c=0';
   const c=w.document.getElementById('mask'),blob=await new Promise(resolve=>c.toBlob(resolve));
@@ -323,7 +323,7 @@ test('legacy automatic mask runs block untouched, wrong-grid and detached-owner 
 test('mask provenance rejects changes to every recorded grid dimension',async()=>{
  const {dom,w,errors}=await viewer();
  try{
-  click(w,'etiq');await settle();
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
   const info={...w.mascaraCorridaInfo(null,8,4),malla_sha256:'fixture-mesh',grid_id:'fixture-grid',orientacion:{correccion:[0,0,0]}};
   for(const [key,value] of Object.entries({ancho:9,alto:5,lamina:'other',segmento:'other',profundidad:2,cara:'rev',scroll:'PHerc1447',base:'other',grid_id:'other',malla_sha256:'other',orientacion:{correccion:[1,0,0]}})){
    assert.equal(w.verificarCorridaMascara({...info,[key]:value},info).ok,false,key);
@@ -339,8 +339,10 @@ test('stored per-sheet masks restore once into a depth and keep display colors s
   const blob=await new Promise(resolve=>canvas.toBlob(resolve));
   const pixels=new Uint8ClampedArray(8*4*4);pixels.set([60,220,90,255]);
   w.createImageBitmap=async()=>({width:8,height:4,_pixels:pixels,close(){}});
+  click(w,'etiq');await waitFor(()=>w.annotationImageReady());
   await idb('readwrite',s=>s.put(blob,'fixture-run'));
-  click(w,'etiq');await waitFor(()=>w.document.getElementById('mask').getContext('2d').getImageData(0,0,8,4).data[3]===255);
+  await w.restaurar(vm.runInContext('H.nombre',context));
+  assert.equal(w.document.getElementById('mask').getContext('2d').getImageData(0,0,8,4).data[3],255);
   await waitFor(async()=>await idb('readonly',s=>s.get('fixture-run'))===undefined);
   input(w,'colTinta','#112233');input(w,'colNo','#445566');
   assert.equal(JSON.parse(w.localStorage.getItem('vesuvius.etiq.colores')).tinta,'#112233');
@@ -352,7 +354,7 @@ test('stored per-sheet masks restore once into a depth and keep display colors s
 test('saved mask load rejects another grid, then replaces a matching grid with undo',async()=>{
  const {dom,w,context,errors}=await viewer();
  try{
-  click(w,'etiq');await settle();
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
   const info={...w.mascaraCorridaInfo(null,8,4),malla_sha256:'fixture-mesh',grid_id:'fixture-grid',orientacion:{correccion:[0,0,0]}};
   let decoded=0;
   w.obtenerParMascara=async()=>({blobs:[],corrida:{...info,ancho:9}});
