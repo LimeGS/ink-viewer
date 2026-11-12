@@ -56,6 +56,9 @@ SCROLL = ROLLO = None
 ESPEJO = None           # espejo nginx de all-gallery-backing en work-3: <clave de CAMPANA_S3>/<rollo>/all-gallery-backing/
 LABELS_UNKNOWN = None   # base de etiquetas de una lamina sin segmento conocido: _unresolved/<rollo>
 PORT = int(os.environ.get('S3CACHE_PORT', 8797))
+# Listen address; keep loopback by default. The Docker image sets 0.0.0.0 and the
+# host should publish the port on 127.0.0.1 only (writes are loopback-gated).
+BIND = os.environ.get('S3CACHE_BIND', '127.0.0.1')
 TYPES = {'.png': 'image/png', '.jpg': 'image/jpeg'}
 
 
@@ -1005,7 +1008,7 @@ def main():
     else:
         log(f'arrancando {"todos los rollos" if not SCROLL else SCROLL} en :{PORT}, docroot={ROOT}; imagenes: Mac -> work-3 '
             f'({WORK3_BASE}) -> S3 una vez a work-3; etiquetas en work-3' + (f' (sin segmento: {LABELS_UNKNOWN})' if LABELS_UNKNOWN else ''))
-    srv = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    srv = ThreadingHTTPServer((BIND, PORT), Handler)
     srv.fuente, srv.config_path = source, config_path
     srv.config_token, srv.config_lock = secrets.token_urlsafe(32), threading.Lock()
     srv.daemon_threads = True

@@ -376,3 +376,24 @@ CI enforces **at least 90% line coverage separately for the complete Python pack
 
 Tests use temporary datasets, local HTTP stand-ins and a simulated browser DOM with canvas/image replacements. For UI changes, also check a real browser with a small dataset: image loading, source switching, depth/model navigation, annotation import/export and save/reload where applicable. Unit coverage does not establish visual correctness, scientific quality or performance on your full dataset.
 
+
+## Run with Docker
+
+Build once, then point the container at a prepared dataset. Publish the port on
+127.0.0.1 only: the server accepts saves and configuration changes only from loopback.
+
+```sh
+docker build -t ink-viewer .
+docker run --rm --user "$(id -u):$(id -g)" -p 127.0.0.1:8797:8797 \
+  -v /absolute/path/to/dataset:/data:ro \
+  -v "$HOME/ink-viewer-annotations":/annotations \
+  ink-viewer
+```
+
+`--user` lets the container read a catalog prepared on the host (the manifest generator
+writes `_viewer/*.json` as 0600) and keeps saved masks owned by you.
+
+Open http://127.0.0.1:8797/all-gallery/index.html. For a public S3 or HTTP dataset, skip
+the `/data` mount and pass the origin instead, for example
+`ink-viewer --origen https://YOUR_BUCKET.s3.YOUR_REGION.amazonaws.com/PREFIX --anotaciones /annotations`.
+Outside Docker nothing changes: the server still listens on 127.0.0.1 unless `S3CACHE_BIND` is set.
