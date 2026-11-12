@@ -1,3 +1,4 @@
+import os
 import copy
 import gzip
 import json
@@ -95,6 +96,10 @@ class Performance(unittest.TestCase):
             path.write_text('window.version=1;')
             first = proxy.tools_bytes(((str(path), proxy.file_revision(path)),))
             path.write_text('window.version=2;')
+            # Same size and inode, written within one filesystem clock tick: move mtime
+            # forward as a later real edit would, so the test does not depend on timing.
+            later = path.stat().st_mtime_ns + 1_000_000_000
+            os.utime(path, ns=(later, later))
             second = proxy.tools_bytes(((str(path), proxy.file_revision(path)),))
             self.assertNotEqual(first[2], second[2])
 

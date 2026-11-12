@@ -346,6 +346,9 @@ def manifest_bytes(source, revision):
 
 
 def file_revision(path):
+    # Cache key for the lru_cache readers below. Filesystem timestamps can be coarser
+    # than their nanosecond fields (one kernel tick on many Linux setups), so two
+    # same-size rewrites of one file within a tick can share a revision.
     stat = Path(path).stat()
     return stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size
 
