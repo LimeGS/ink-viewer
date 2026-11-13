@@ -271,6 +271,7 @@ For publication from another machine, `ink-viewer-publish --help` describes send
 The viewer can run a public ink model on a segment through [ink-sdk](https://github.com/LimeGS/ink-sdk) and show the result like any catalog map. It is off unless you point it at a Python environment where ink-sdk is installed (GPU and checkpoints are ink-sdk's own requirements):
 
 ```sh
+python -m pip install -e ".[inksdk]"     # numpy, used to write the generated maps
 export INK_SDK_PYTHON=/path/to/ink-sdk/.venv/bin/python
 export VILLA=/path/to/villa VILLA_PY=/path/to/villa/ink-detection/.venv/bin/python   # 9 um models only
 ink-viewer --origen /absolute/path/to/catalog --anotaciones ~/ink-notes   # or any indexed HTTP/S3 source
