@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 from ink_viewer.server.fuentes import Fuente, guardar_json, ruta_dentro
 import ink_viewer.server.canonical_masks as canonical
 import ink_viewer.catalog.master_inventory as master
+import ink_viewer.server.inksdk_job as inksdk
 
 from ink_viewer.paths import WEB_ROOT, web_asset
 
@@ -530,6 +531,11 @@ class Handler(SimpleHTTPRequestHandler):
                 if mask.is_file():
                     with mask.open('rb') as body:
                         return self._fuente_stream(200, {'Content-Length': str(mask.stat().st_size), 'Content-Type': self.guess_type(str(mask))}, body, head)
+        generated = inksdk.archivo_generado(source, rel)
+        if generated:
+            with generated.open('rb') as body:
+                return self._fuente_stream(200, {'Content-Length': str(generated.stat().st_size),
+                                                 'Content-Type': self.guess_type(str(generated))}, body, head, fuente='ink-sdk')
         candidates = source.rutas_visor(rel)
         for index, candidate in enumerate(candidates):
             try:
@@ -599,12 +605,28 @@ class Handler(SimpleHTTPRequestHandler):
                     body, compressed, etag = manifest_bytes(self.fuente, revision)
                 else:
                     body, compressed, etag = manifest_bytes.__wrapped__(self.fuente, None)
+                extra = inksdk.manifest_generado(self.fuente)
+                if extra:  # maps generated here by ink-sdk jobs live beside the annotations, never in the source
+                    data = json.loads(body.decode()[len('window.manifest='):].rstrip().rstrip(';')) + extra
+                    body, compressed, etag = encoded_bytes(('window.manifest=' + json.dumps(data, separators=(',', ':')) + ';\n').encode())
                 return self._send_bytes(body, 'application/javascript', self.fuente.tipo, head,
                                         etag=etag, gzipped=compressed)
             if self.fuente.manifest_rel and path in ('catalog/_viewer/manifest-work3.js', 'all-gallery/derived-c019/manifest-c019-local.js'):
                 return self._send_bytes(b'// Generated index is authoritative.\n', 'application/javascript', self.fuente.tipo, head)
             if path.startswith('api/mapa/'):
                 return self._mapa_tiff(path[len('api/mapa/'):], int(params.get('escala', ['1'])[0]), head)
+            if path == 'api/inksdk':
+                ok, why = inksdk.disponible()
+                return self._json({'disponible': ok, 'motivo': why, 'escritura': bool(self.fuente.anotaciones),
+                                   'perfiles': inksdk.perfiles() if ok else []})
+            if path == 'api/inksdk/volumenes':
+                vols = inksdk.volumenes(self.fuente, params.get('rollo', [''])[0], params.get('segmento', [''])[0])
+                ok, _ = inksdk.disponible()
+                profiles = inksdk.perfiles() if ok else []
+                return self._json([dict({k: v for k, v in v.items() if k != 'rel'},
+                                        perfiles=[p['id'] for p in profiles if inksdk.compatible(p, v['res'])]) for v in vols])
+            if path == 'api/inksdk/trabajos':
+                return self._json(inksdk.TRABAJOS.lista())
             if path == 'api/inventario':
                 return self._json(master.listing(self.fuente, params))
             if path == 'api/inventario-mapa':
@@ -652,8 +674,13 @@ class Handler(SimpleHTTPRequestHandler):
                 data = self.fuente.indice('propuestas.json')
                 return self._json(sorted(data) if isinstance(data, list) else [])
             if path.startswith('api/dims/'):
-                with self.fuente.abrir(self.fuente.ruta_catalogo(path[len('api/dims/'):]), rango='bytes=0-23') as (_, _, body):
-                    hdr = body.read(24)
+                generated = inksdk.archivo_generado(self.fuente, path[len('api/dims/'):])
+                if generated:
+                    with generated.open('rb') as body:
+                        hdr = body.read(24)
+                else:
+                    with self.fuente.abrir(self.fuente.ruta_catalogo(path[len('api/dims/'):]), rango='bytes=0-23') as (_, _, body):
+                        hdr = body.read(24)
                 if len(hdr) != 24 or hdr[:8] != b'\x89PNG\r\n\x1a\n': raise ValueError('No es una cabecera PNG')
                 w, h = struct.unpack('>II', hdr[16:24])
                 return self._json({'w': w, 'h': h})
@@ -900,6 +927,22 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({'error': 'Origen de solo lectura: configura una carpeta de anotaciones'}, 403)
         if path.startswith('api/mascara-par/'):
             return self._guardar_par(path[len('api/mascara-par/'):])
+        if path == 'api/inksdk/trabajos':
+            if not self.fuente:
+                return self._json({'error': 'ink-sdk jobs need a configured source'}, 400)
+            ok, why = inksdk.disponible()
+            if not ok:
+                return self._json({'error': why}, 503)
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                data = json.loads(self.rfile.read(n)) if 0 < n <= 4096 else None
+                if not isinstance(data, dict):
+                    raise ValueError('Expected a JSON object')
+                job = inksdk.TRABAJOS.crear(self.fuente, data.get('rollo'), data.get('segmento'), data.get('volumen'),
+                                            data.get('perfil'), log)
+            except (ValueError, TypeError, PermissionError) as error:
+                return self._json({'error': str(error)}, 400)
+            return self._json(job, 202)
         if not path.startswith('api/mascara/'):
             return self.send_error(404)
         rel = path[len('api/mascara/'):]

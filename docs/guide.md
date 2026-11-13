@@ -266,6 +266,29 @@ The controller uses the Python environment recorded at initialization. Keep its 
 
 For publication from another machine, `ink-viewer-publish --help` describes sending a committed source bundle over SSH to an already initialized deployment. Publication checks the selected Git history, refuses runtime data in the bundle and refuses to overwrite a dirty or unrelated remote checkout. Configure the remote machine's data and credentials separately.
 
+## Generate maps with ink-sdk (optional)
+
+The viewer can run a public ink model on a segment through [ink-sdk](https://github.com/LimeGS/ink-sdk) and show the result like any catalog map. It is off unless you point it at a Python environment where ink-sdk is installed (GPU and checkpoints are ink-sdk's own requirements):
+
+```sh
+export INK_SDK_PYTHON=/path/to/ink-sdk/.venv/bin/python
+export VILLA=/path/to/villa VILLA_PY=/path/to/villa/ink-detection/.venv/bin/python   # 9 um models only
+ink-viewer --origen /absolute/path/to/catalog --anotaciones ~/ink-notes   # or any indexed HTTP/S3 source
+```
+
+Inputs are the segment's published surface volumes, `<sample>/segments/<segment>/surface-volumes/<res>um-[<dist>m-]<keV>keV-volume-<id>.zarr`, read through the same source (local, HTTP or S3). Only level 0 is used; it is copied chunk by chunk into `INK_VIEWER_SV_CACHE` (default `~/.cache/ink-viewer/surface-volumes`, refused above `INK_VIEWER_SV_MAX_GB`, default 16). A model is offered for a volume only when the volume's resolution is within the model's declared scale tolerance.
+
+Outputs are never written to the source. Each job writes, under the annotations folder at `<anotaciones>/<source id>/generated/`, one catalog-named PNG per depth direction (model field `<profile>-fwd` / `-rev`), browsing previews, a receipt with the full ink-sdk receipt and the depth window, and a generated index that the server appends to the manifest (`fam`: `ink-sdk (generated here)`). Without an annotations folder the source is read-only and jobs are refused. Jobs run one at a time.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/inksdk` | availability, reason, profiles |
+| `GET /api/inksdk/volumenes?rollo=&segmento=` | surface volumes of a segment and the compatible profiles |
+| `GET /api/inksdk/trabajos` | jobs and their state (`en cola`, `copiando`, `inferencia`, `listo`, `error`) |
+| `POST /api/inksdk/trabajos` | `{"rollo", "segmento", "volumen", "perfil"}`; same origin and `X-Visor-Origen` checks as annotation writes |
+
+The depth window matters: moving a 9 um model's 17-layer window by one layer can change the map noticeably, and stacks with an even number of layers have no single centre. The receipt records the window ink-sdk used, so maps read from different windows are not compared blind.
+
 ## Annotation formats and integrity
 
 Annotations use the **full-resolution original raster**. Previews are browsing aids. Zoom, display filters, flips and transpose change the view, not the stored mask grid.
