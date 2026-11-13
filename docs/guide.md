@@ -280,6 +280,8 @@ Inputs are the segment's published surface volumes, `<sample>/segments/<segment>
 
 Outputs are never written to the source. Each job writes, under the annotations folder at `<anotaciones>/<source id>/generated/`, one catalog-named PNG per depth direction (model field `<profile>-fwd` / `-rev`), browsing previews, a receipt with the full ink-sdk receipt and the depth window, and a generated index that the server appends to the manifest (`fam`: `ink-sdk (generated here)`). Without an annotations folder the source is read-only and jobs are refused. Jobs run one at a time.
 
+In the viewer, a **Run model** button appears in the toolbar only when ink-sdk is available and the source has an annotations folder. It opens a dialog for the open catalog segment: pick one of its surface volumes and a compatible model, then Run. The dialog follows the job and reloads the page when the maps are ready; they appear in the segment's list beside the source's own maps.
+
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/inksdk` | availability, reason, profiles |

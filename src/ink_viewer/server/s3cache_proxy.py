@@ -30,7 +30,7 @@ STATIC = {str(path.relative_to(CODE)) for path in CODE.rglob('*')
           if path.is_file() and path.suffix in {'.js', '.css', '.html', '.woff2', '.webp'}}
 VIEWER_TOOLS = ('filtros_pro.js', 'super_mosaico.js', 'precarga.js', 'fallo_visible.js',
                 'explorer_pro.js', 'ui_modos.js', 'hist_v5.js', 'spinner.js', 'etiq_extra.js',
-                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js')
+                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js')
 CACHE = ROOT / '.s3cache'
 LOG_FILE = ROOT / 's3cache_proxy.log'
 # buckets privados (GENERALIZAR.md regla 3): URIs completas sin barra final
