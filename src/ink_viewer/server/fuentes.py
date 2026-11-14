@@ -19,8 +19,15 @@ from urllib.parse import quote, urlsplit
 
 _annotation_locks, _annotation_guard = {}, threading.Lock()
 
-def ruta_dentro(root, rel):
-    if not rel or rel.startswith('/') or '\\' in rel or any(p in ('.', '..') or p.startswith('.') for p in rel.split('/')):
+ZARR_META = frozenset({'.zarray', '.zattrs', '.zgroup'})
+
+
+def ruta_dentro(root, rel, zarr_meta=False):
+    """Resolve rel inside root. Hidden names are refused; zarr_meta=True admits only a final zarr v2 metadata name."""
+    parts = rel.split('/') if rel else []
+    hidden = [i for i, p in enumerate(parts) if p.startswith('.')]
+    allowed = zarr_meta and hidden == [len(parts) - 1] and parts[-1] in ZARR_META
+    if not rel or rel.startswith('/') or '\\' in rel or any(p in ('.', '..') for p in parts) or (hidden and not allowed):
         raise ValueError('Ruta de datos invalida')
     path = (root / rel).resolve()
     if not path.is_relative_to(root.resolve()):
@@ -171,12 +178,12 @@ class Fuente:
         return self._s3
 
     @contextlib.contextmanager
-    def abrir(self, rel, rango=None, head=False):
-        ruta_dentro(Path('/'), rel)
+    def abrir(self, rel, rango=None, head=False, zarr_meta=False):
+        ruta_dentro(Path('/'), rel, zarr_meta)
         if rango and not re.fullmatch(r'bytes=\d*-\d*', rango):
             raise ValueError('Range invalido')
         if self.tipo == 'local':
-            path = ruta_dentro(Path(self.origen), rel)
+            path = ruta_dentro(Path(self.origen), rel, zarr_meta)
             if not path.is_file():
                 # Existing local copies can have the official catalog names in an index.
                 if rel.startswith('catalog/'):
