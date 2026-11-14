@@ -5,7 +5,8 @@ sheet. Ported from Volumen's cortes.py (Paulo Sergio Camillo, MIT): one axial (z
 the mesh crossing of that slice as an ordered curve.
 
 Layout (public bucket and its local copies): ``<sample>/segments/<seg>/mesh/<seg-id>-on-<volume>-<res>um.tifxyz/``
-(one mesh per CT volume, ``meta.json`` scale = grid step per map pixel) and ``<sample>/volumes/<volume>-*.zarr``
+(one mesh per CT volume, ``meta.json`` scale = grid step per map pixel) and ``<sample>/volumes/<volume>-*.zarr``. They are read from the map source, or from ``--ct-origen`` when given (a
+local copy of the maps rarely holds the CT; the public bucket over HTTPS does)
 (level 0 read chunk by chunk through the viewer's Fuente). Sources that cannot list (HTTP) use the deterministic public
 names, built from the map name's resolution, distance and energy. The map names its volume (``-volume-<id>-``), so the mesh
 and the CT are the ones the map was rendered from. Needs numpy, tifffile and numcodecs (extra ``corte``).
@@ -26,6 +27,16 @@ TAM, MAX_TAM, JUMP = 512, 1024, 60
 
 _lock = threading.Lock()
 _meshes, _chunks = OrderedDict(), OrderedDict()
+
+
+def fuente_ct(origen):
+    """Read-only source for meshes and CT (--ct-origen), laid out as a root of PHerc... folders; None if unset."""
+    if not origen:
+        return None
+    from ink_viewer.server.fuentes import Fuente
+    source = Fuente(origen)
+    source.layout = 'catalog'
+    return source
 
 
 def _cache(store, key, make, limit):

@@ -631,7 +631,7 @@ class Handler(SimpleHTTPRequestHandler):
             if path == 'api/corte':
                 q = {k: v[0] for k, v in params.items()}
                 try:
-                    body, info = corte.corte_png(self.fuente, q.get('rollo'), q.get('segmento'), q.get('volumen'),
+                    body, info = corte.corte_png(getattr(self.server, 'ct_fuente', None) or self.fuente, q.get('rollo'), q.get('segmento'), q.get('volumen'),
                                                  q.get('u', ''), q.get('v', ''), q.get('w'), q.get('h'), q.get('tam', corte.TAM),
                                                  q.get('res'), q.get('dist'), q.get('kev'))
                 except ImportError as e:
@@ -1038,6 +1038,9 @@ def main():
     ap.add_argument('--s3-perfil', default=os.environ.get('VISOR_S3_PERFIL', ''), help='perfil AWS; omitido = credenciales estandar del SDK')
     ap.add_argument('--s3-endpoint', default=os.environ.get('VISOR_S3_ENDPOINT', ''), help='endpoint HTTP/HTTPS de un S3 compatible, por ejemplo MinIO')
     ap.add_argument('--s3-region', default=os.environ.get('VISOR_S3_REGION', ''), help='region del origen S3')
+    ap.add_argument('--ct-origen', default=os.environ.get('VISOR_CT_ORIGEN', ''),
+                    help='where cross-sections read meshes and CT when the map source lacks them: a root holding PHerc... '
+                         'folders, e.g. https://vesuvius-challenge-open-data.s3.amazonaws.com (read-only)')
     ap.add_argument('--config', default=os.environ.get('VISOR_CONFIG', str(Path.home() / '.config/vesuvius-visor/config.json')), help='archivo JSON que recuerda el origen elegido desde el visor')
     a = ap.parse_args()
     config_path = Path(a.config).expanduser().resolve()
@@ -1059,6 +1062,11 @@ def main():
     PORT = info['port'] = a.port
     if source:
         info = dict(source.info(), port=a.port, config=str(config_path), codigo=str(CODE))
+    try:
+        ct_source = corte.fuente_ct(a.ct_origen)
+    except (ValueError, TypeError, OSError) as e:
+        ap.error('--ct-origen: ' + str(e))
+    info['ct_origen'] = ct_source.origen if ct_source else ''
     if a.dry_run:
         print(json.dumps(info, indent=1, ensure_ascii=False))
         return
@@ -1071,7 +1079,7 @@ def main():
         log(f'arrancando {"todos los rollos" if not SCROLL else SCROLL} en :{PORT}, docroot={ROOT}; imagenes: Mac -> work-3 '
             f'({WORK3_BASE}) -> S3 una vez a work-3; etiquetas en work-3' + (f' (sin segmento: {LABELS_UNKNOWN})' if LABELS_UNKNOWN else ''))
     srv = ThreadingHTTPServer((BIND, PORT), Handler)
-    srv.fuente, srv.config_path = source, config_path
+    srv.fuente, srv.config_path, srv.ct_fuente = source, config_path, ct_source
     srv.config_token, srv.config_lock = secrets.token_urlsafe(32), threading.Lock()
     srv.daemon_threads = True
     try:

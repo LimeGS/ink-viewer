@@ -165,5 +165,38 @@ class Corte(unittest.TestCase):
                 self.assertEqual(e.exception.code, 501)
 
 
+class CorteOrigen(unittest.TestCase):
+    """--ct-origen: maps in one folder, meshes and CT in another (in practice the public bucket over HTTPS)."""
+    def test_maps_here_ct_there(self):
+        corte._meshes.clear(); corte._chunks.clear()
+        with tempfile.TemporaryDirectory() as t:
+            ct_root, maps = Path(t) / 'ct', Path(t) / 'maps'
+            ct_root.mkdir(); maps.mkdir()
+            catalogo(ct_root)
+            for rel in ('_viewer/manifest.json', '_viewer/index-info.json'):
+                (maps / rel).parent.mkdir(parents=True, exist_ok=True); (maps / rel).write_bytes((ct_root / rel).read_bytes())
+            f = Fuente(str(maps)); f.verificar()
+            self.assertIsNone(corte.fuente_ct(''))
+            ct = corte.fuente_ct(str(ct_root)); self.assertEqual(ct.layout, 'catalog')
+            q = f'/api/corte?rollo=PHerc0841&segmento={SEG}&volumen={VOL}&u=8&v=12&w=80&h=36&tam=64'
+            with servidor(proxy.Handler, f) as (srv, url):
+                with self.assertRaises(urllib.error.HTTPError) as e:
+                    urllib.request.urlopen(url + q)                   # the map folder has no mesh or CT
+                self.assertEqual(e.exception.code, 404)
+                srv.ct_fuente = ct
+                self.assertEqual(urllib.request.urlopen(url + q).headers['Content-Type'], 'image/png')
+
+    def test_command_line(self):
+        with tempfile.TemporaryDirectory() as t:
+            maps = Path(t); catalogo(maps)
+            argv = ['ink-viewer', '--origen', str(maps), '--ct-origen', str(maps), '--dry-run', '--config', str(maps / 'c.json')]
+            with patch('sys.argv', argv), patch('sys.stdout', new_callable=io.StringIO) as out:
+                proxy.main()
+            self.assertEqual(json.loads(out.getvalue())['ct_origen'], str(maps.resolve()))
+            with patch('sys.argv', argv[:3] + ['--ct-origen', str(maps / 'missing'), '--dry-run']), \
+                    patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit):
+                proxy.main()
+
+
 if __name__ == '__main__':
     unittest.main()

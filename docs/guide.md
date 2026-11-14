@@ -298,6 +298,8 @@ The **Cross-section** button turns on a mode where clicking a point on the map o
 
 It needs `python -m pip install -e ".[corte]"` (numpy, tifffile, numcodecs) and a source with the public layout: `<sample>/segments/<segment>/mesh/<segment-id>-on-<volume>-<res>um.tifxyz/` and `<sample>/volumes/<volume>-...zarr`. The map's catalog name says which CT volume it was rendered from (`-volume-<id>-`), and the mesh and the CT with that id are used; maps without a volume id cannot be matched. The slice is axial (one z plane, 512 voxels around the point, level 0), read chunk by chunk through the same source; only the chunks under the window are fetched. The map point is placed on the mesh grid with the mesh scale; when the map size does not match the mesh, the mapping falls back to proportional and the slice says so. Sources that cannot list folders (HTTP) use the public naming, built from the map name's resolution, distance and energy; volumes with an extra tag in their name (for example `-pag0-`) need a local or S3 source.
 
+A local copy of the maps rarely holds the CT, so meshes and CT can come from another, read-only root of `PHerc...` folders: `--ct-origen https://vesuvius-challenge-open-data.s3.amazonaws.com` (or `VISOR_CT_ORIGEN`) reads them from the public bucket without credentials, fetching only the chunks under each slice. Without it they are read from the map source.
+
 `GET /api/corte?rollo=&segmento=&volumen=&u=&v=[&w=&h=&tam=]` returns the PNG, with `X-Corte` (point in voxels, window, mapping) as a header.
 
 Ported from the cross-section view of [Volumen](https://github.com/pscamillo/volumen) (MIT).
