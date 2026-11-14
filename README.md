@@ -15,8 +15,14 @@ Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cl
 - Review existing v5 scores, quality gates and calibrated measurements when supplied by the dataset.
 - Paint ink and reviewed non-ink, undo edits, import masks and export matched annotation pairs with grid provenance.
 - Browse with lazy thumbnails and previews; annotate on the full-resolution original raster.
+- Run a public ink model on the open segment through [ink-sdk](https://github.com/LimeGS/ink-sdk) (optional) and add its maps to the list.
+- Click a map point to see the CT cross-section through it, with the segment's mesh drawn on top (optional).
 
-The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not run inference or training, decode CT/Zarr volumes, or render 3D meshes. Missing scores and calibration remain unknown.
+The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not train models or render 3D meshes; inference runs only through the optional ink-sdk integration, and CT is read only for cross-sections. Missing scores and calibration remain unknown.
+
+![Two ink models side by side on a PHerc0841 segment](docs/images/compare-models.jpg)
+
+![Cross-sections: the mesh on its sheet (left) and cutting across the layers (right)](docs/images/cross-sections.jpg)
 
 ## Quick start
 
