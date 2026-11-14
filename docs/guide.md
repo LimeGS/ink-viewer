@@ -292,6 +292,16 @@ In the viewer, a **Run model** button appears in the toolbar only when ink-sdk i
 
 The depth window matters: moving a 9 um model's 17-layer window by one layer can change the map noticeably, and stacks with an even number of layers have no single centre. The receipt records the window ink-sdk used, so maps read from different windows are not compared blind.
 
+## Cross-sections (optional)
+
+The **Cross-section** button turns on a mode where clicking a point on the map opens a slice of the raw CT through that point, with the segment's mesh drawn in orange and the point in cyan. A curve that follows the layers is a surface sitting on a sheet; one that cuts across them has crossed to another sheet, so a mark there may belong to the neighbouring sheet. Click and drag still pans; only a click without movement opens the slice.
+
+It needs `python -m pip install -e ".[corte]"` (numpy, tifffile, numcodecs) and a source with the public layout: `<sample>/segments/<segment>/mesh/<segment-id>-on-<volume>-<res>um.tifxyz/` and `<sample>/volumes/<volume>-...zarr`. The map's catalog name says which CT volume it was rendered from (`-volume-<id>-`), and the mesh and the CT with that id are used; maps without a volume id cannot be matched. The slice is axial (one z plane, 512 voxels around the point, level 0), read chunk by chunk through the same source; only the chunks under the window are fetched. The map point is placed on the mesh grid with the mesh scale; when the map size does not match the mesh, the mapping falls back to proportional and the slice says so. Sources that cannot list folders (HTTP) use the public naming, built from the map name's resolution, distance and energy; volumes with an extra tag in their name (for example `-pag0-`) need a local or S3 source.
+
+`GET /api/corte?rollo=&segmento=&volumen=&u=&v=[&w=&h=&tam=]` returns the PNG, with `X-Corte` (point in voxels, window, mapping) as a header.
+
+Ported from the cross-section view of [Volumen](https://github.com/pscamillo/volumen) (MIT).
+
 ## Annotation formats and integrity
 
 Annotations use the **full-resolution original raster**. Previews are browsing aids. Zoom, display filters, flips and transpose change the view, not the stored mask grid.

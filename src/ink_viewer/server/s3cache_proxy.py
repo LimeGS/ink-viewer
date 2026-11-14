@@ -20,6 +20,7 @@ from ink_viewer.server.fuentes import Fuente, guardar_json, ruta_dentro
 import ink_viewer.server.canonical_masks as canonical
 import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.inksdk_job as inksdk
+import ink_viewer.server.corte as corte
 
 from ink_viewer.paths import WEB_ROOT, web_asset
 
@@ -30,7 +31,7 @@ STATIC = {str(path.relative_to(CODE)) for path in CODE.rglob('*')
           if path.is_file() and path.suffix in {'.js', '.css', '.html', '.woff2', '.webp'}}
 VIEWER_TOOLS = ('filtros_pro.js', 'super_mosaico.js', 'precarga.js', 'fallo_visible.js',
                 'explorer_pro.js', 'ui_modos.js', 'hist_v5.js', 'spinner.js', 'etiq_extra.js',
-                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js')
+                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js', 'corte.js')
 CACHE = ROOT / '.s3cache'
 LOG_FILE = ROOT / 's3cache_proxy.log'
 # buckets privados (GENERALIZAR.md regla 3): URIs completas sin barra final
@@ -627,6 +628,24 @@ class Handler(SimpleHTTPRequestHandler):
                                         perfiles=[p['id'] for p in profiles if inksdk.compatible(p, v['res'])]) for v in vols])
             if path == 'api/inksdk/trabajos':
                 return self._json(inksdk.TRABAJOS.lista())
+            if path == 'api/corte':
+                q = {k: v[0] for k, v in params.items()}
+                try:
+                    body, info = corte.corte_png(self.fuente, q.get('rollo'), q.get('segmento'), q.get('volumen'),
+                                                 q.get('u', ''), q.get('v', ''), q.get('w'), q.get('h'), q.get('tam', corte.TAM),
+                                                 q.get('res'), q.get('dist'), q.get('kev'))
+                except ImportError as e:
+                    return self._json({'error': 'Cross-sections need numpy, tifffile and numcodecs (pip install ".[corte]"): ' + str(e)}, 501)
+                except (ValueError, FileNotFoundError) as e:
+                    return self._json({'error': str(e)}, 404 if isinstance(e, FileNotFoundError) else 400)
+                self.send_response(200)
+                for k, v in (('Content-Type', 'image/png'), ('Content-Length', str(len(body))), ('X-Corte', json.dumps(info)),
+                             ('Cache-Control', 'private, max-age=3600')):
+                    self.send_header(k, v)
+                self.end_headers()
+                if not head:
+                    self.wfile.write(body)
+                return
             if path == 'api/inventario':
                 return self._json(master.listing(self.fuente, params))
             if path == 'api/inventario-mapa':
