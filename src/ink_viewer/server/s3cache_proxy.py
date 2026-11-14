@@ -20,6 +20,7 @@ from ink_viewer.server.fuentes import Fuente, guardar_json, ruta_dentro
 import ink_viewer.server.canonical_masks as canonical
 import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.inksdk_job as inksdk
+import ink_viewer.server.corte as corte
 
 from ink_viewer.paths import WEB_ROOT, web_asset
 
@@ -30,7 +31,7 @@ STATIC = {str(path.relative_to(CODE)) for path in CODE.rglob('*')
           if path.is_file() and path.suffix in {'.js', '.css', '.html', '.woff2', '.webp'}}
 VIEWER_TOOLS = ('filtros_pro.js', 'super_mosaico.js', 'precarga.js', 'fallo_visible.js',
                 'explorer_pro.js', 'ui_modos.js', 'hist_v5.js', 'spinner.js', 'etiq_extra.js',
-                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js')
+                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js', 'corte.js')
 CACHE = ROOT / '.s3cache'
 LOG_FILE = ROOT / 's3cache_proxy.log'
 # buckets privados (GENERALIZAR.md regla 3): URIs completas sin barra final
@@ -627,6 +628,24 @@ class Handler(SimpleHTTPRequestHandler):
                                         perfiles=[p['id'] for p in profiles if inksdk.compatible(p, v['res'])]) for v in vols])
             if path == 'api/inksdk/trabajos':
                 return self._json(inksdk.TRABAJOS.lista())
+            if path == 'api/corte':
+                q = {k: v[0] for k, v in params.items()}
+                try:
+                    body, info = corte.corte_png(getattr(self.server, 'ct_fuente', None) or self.fuente, q.get('rollo'), q.get('segmento'), q.get('volumen'),
+                                                 q.get('u', ''), q.get('v', ''), q.get('w'), q.get('h'), q.get('tam', corte.TAM),
+                                                 q.get('res'), q.get('dist'), q.get('kev'))
+                except ImportError as e:
+                    return self._json({'error': 'Cross-sections need numpy, tifffile and numcodecs (pip install ".[corte]"): ' + str(e)}, 501)
+                except (ValueError, FileNotFoundError) as e:
+                    return self._json({'error': str(e)}, 404 if isinstance(e, FileNotFoundError) else 400)
+                self.send_response(200)
+                for k, v in (('Content-Type', 'image/png'), ('Content-Length', str(len(body))), ('X-Corte', json.dumps(info)),
+                             ('Cache-Control', 'private, max-age=3600')):
+                    self.send_header(k, v)
+                self.end_headers()
+                if not head:
+                    self.wfile.write(body)
+                return
             if path == 'api/inventario':
                 return self._json(master.listing(self.fuente, params))
             if path == 'api/inventario-mapa':
@@ -1019,6 +1038,9 @@ def main():
     ap.add_argument('--s3-perfil', default=os.environ.get('VISOR_S3_PERFIL', ''), help='perfil AWS; omitido = credenciales estandar del SDK')
     ap.add_argument('--s3-endpoint', default=os.environ.get('VISOR_S3_ENDPOINT', ''), help='endpoint HTTP/HTTPS de un S3 compatible, por ejemplo MinIO')
     ap.add_argument('--s3-region', default=os.environ.get('VISOR_S3_REGION', ''), help='region del origen S3')
+    ap.add_argument('--ct-origen', default=os.environ.get('VISOR_CT_ORIGEN', ''),
+                    help='where cross-sections read meshes and CT when the map source lacks them: a root holding PHerc... '
+                         'folders, e.g. https://vesuvius-challenge-open-data.s3.amazonaws.com (read-only)')
     ap.add_argument('--config', default=os.environ.get('VISOR_CONFIG', str(Path.home() / '.config/vesuvius-visor/config.json')), help='archivo JSON que recuerda el origen elegido desde el visor')
     a = ap.parse_args()
     config_path = Path(a.config).expanduser().resolve()
@@ -1040,6 +1062,11 @@ def main():
     PORT = info['port'] = a.port
     if source:
         info = dict(source.info(), port=a.port, config=str(config_path), codigo=str(CODE))
+    try:
+        ct_source = corte.fuente_ct(a.ct_origen)
+    except (ValueError, TypeError, OSError) as e:
+        ap.error('--ct-origen: ' + str(e))
+    info['ct_origen'] = ct_source.origen if ct_source else ''
     if a.dry_run:
         print(json.dumps(info, indent=1, ensure_ascii=False))
         return
@@ -1052,7 +1079,7 @@ def main():
         log(f'arrancando {"todos los rollos" if not SCROLL else SCROLL} en :{PORT}, docroot={ROOT}; imagenes: Mac -> work-3 '
             f'({WORK3_BASE}) -> S3 una vez a work-3; etiquetas en work-3' + (f' (sin segmento: {LABELS_UNKNOWN})' if LABELS_UNKNOWN else ''))
     srv = ThreadingHTTPServer((BIND, PORT), Handler)
-    srv.fuente, srv.config_path = source, config_path
+    srv.fuente, srv.config_path, srv.ct_fuente = source, config_path, ct_source
     srv.config_token, srv.config_lock = secrets.token_urlsafe(32), threading.Lock()
     srv.daemon_threads = True
     try:
