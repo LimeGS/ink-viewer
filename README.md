@@ -8,6 +8,8 @@
 
 Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cloud provider is required. Bring your own prepared dataset; maps, annotations, credentials and machine settings stay outside this repository.
 
+![The viewer comparing two ink models on a PHerc0841 segment](docs/images/ui-overview.jpg)
+
 ## Features
 
 - Search and filter scrolls, segments, model runs and depth offsets in one explorer.
@@ -19,8 +21,6 @@ Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cl
 - Click a map point to see the CT cross-section through it, with the segment's mesh drawn on top (optional).
 
 The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not train models or render 3D meshes; inference runs only through the optional ink-sdk integration, and CT is read only for cross-sections. Missing scores and calibration remain unknown.
-
-![Two ink models side by side on a PHerc0841 segment](docs/images/compare-models.jpg)
 
 ![Cross-sections: the mesh on its sheet (left) and cutting across the layers (right)](docs/images/cross-sections.jpg)
 
@@ -49,7 +49,8 @@ ink-viewer --origen /absolute/path/to/catalog
 
 This creates `_viewer/manifest.json` and `_viewer/index-info.json`, without rewriting maps. See [dataset layout and naming](docs/guide.md#prepare-a-dataset) for requirements and existing manifest formats.
 
-### Save annotations
+<details>
+<summary><b>Save annotations</b></summary>
 
 Create a separate local directory and supply it at startup:
 
@@ -63,9 +64,12 @@ Omitting `--anotaciones` disables server saves; browser-local editing and downlo
 
 Masks retain the original image grid. Binary-pair, ink-only and tri-state imports have different meanings for unknown pixels; read [annotation formats and integrity](docs/guide.md#annotation-formats-and-integrity) before exchanging labels.
 
+</details>
+
 ## Data sources
 
-### Public S3 or HTTP, without credentials
+<details>
+<summary><b>Public S3 or HTTP, without credentials</b></summary>
 
 Use the dataset's HTTPS object endpoint, replacing the placeholders:
 
@@ -76,7 +80,10 @@ ink-viewer --origen \
 
 Point to the indexed dataset root, not a PNG or AWS Console page. The index and referenced maps must be publicly readable. HTTP cannot discover a catalog by directory listing: public objects alone are insufficient without a viewer manifest. The same command accepts another HTTP server or CDN root.
 
-### Authenticated S3 and compatible storage
+</details>
+
+<details>
+<summary><b>Authenticated S3 and compatible storage</b></summary>
 
 ```sh
 ink-viewer --origen s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
@@ -85,11 +92,18 @@ ink-viewer --origen s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
 
 Omit `--s3-perfil` to use the standard SDK credential chain. Add `--s3-endpoint https://storage.example.org` for a compatible store. The current `s3://` mode uses SDK authentication; use HTTPS for anonymous public browsing.
 
+</details>
+
 See the guide for [public index preparation and publication](docs/guide.md#connect-to-public-s3), [authenticated storage](docs/guide.md#authenticated-s3-and-compatible-storage), and [configuration flags, environment variables and JSON](docs/guide.md#configuration).
 
 ## Self-hosting
 
-Install and run the same application on your server. It listens on **127.0.0.1:8797**. To access it from your laptop:
+Install and run the same application on your server; it listens on **127.0.0.1:8797**.
+
+<details>
+<summary><b>SSH tunnel, ports and services</b></summary>
+
+To access it from your laptop:
 
 ```sh
 ssh -N -o ExitOnForwardFailure=yes \
@@ -100,9 +114,14 @@ Open the same localhost URL on the laptop and keep both the server and tunnel ru
 
 The guide covers [persistent Linux services](docs/guide.md#deploy-on-your-own-server) and optional [managed releases, previews and rollback](docs/guide.md#managed-releases-previews-and-rollback). A static S3 website alone cannot host the application; its Python API is required.
 
+</details>
+
 ## Security
 
 Ink Viewer assumes a **trusted operator**. It has no user accounts or per-user authorization. The source picker acts with the server account's filesystem and network permissions, so application access grants more than access to the selected dataset.
+
+<details>
+<summary><b>Hardening, reporting and audits</b></summary>
 
 Keep access private through loopback/SSH, run with least privilege, keep credentials outside Git and browser code, and back up annotations. Shared deployments need access control and integration with Host/Origin checks; HTTPS alone is not authentication. See the [security guidance](docs/guide.md#security) for details.
 
@@ -110,9 +129,14 @@ Report vulnerabilities privately using **Report a vulnerability** on the [Securi
 
 Dependency audits run on pushes and pull requests. A passing badge means the tools found no known dependency advisories at that time; it is not a complete security assessment.
 
+</details>
+
 ## Contributing
 
 Bug fixes, documentation and synthetic test fixtures are welcome. Use [issues](https://github.com/LimeGS/ink-viewer/issues) for ordinary bugs or proposals; include reproduction steps, expected/actual behaviour and relevant software versions. Discuss substantial changes first, then submit a focused pull request from a branch on your fork against `main`.
+
+<details>
+<summary><b>Development setup and checks</b></summary>
 
 For development, use Node 24 (CI's version), activate the Python virtual environment above, and install test dependencies:
 
@@ -126,6 +150,8 @@ npm test
 CI enforces **≥90% line coverage separately for Python and browser JavaScript**, plus dependency audits. Use the [full coverage and audit commands](docs/guide.md#run-checks) before submitting. Add meaningful tests for changed behaviour and screenshots for UI changes; also verify UI changes in a real browser, since DOM unit tests do not establish visual correctness.
 
 Keep code under `src/` and research data, generated reports, local settings and secrets outside Git. Preserve native image coordinates, mask ownership and calibration. Explain the problem, resulting behaviour and validation in your pull request. See [architecture and source layout](docs/architecture.md) and the [development reference](docs/guide.md#development-reference).
+
+</details>
 
 ## Documentation
 
