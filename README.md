@@ -8,7 +8,7 @@
 
 By Leonel Wainer and Paulo Sergio Camillo. The visual front end of [ink-sdk](https://github.com/LimeGS/ink-sdk): run any of its ink models on a segment from the viewer, compare the maps side by side, and check a suspected letter against the CT before trusting it.
 
-Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cloud provider is required. Bring your own prepared dataset; maps, annotations, credentials and machine settings stay outside this repository.
+Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cloud provider is required. Browse the maps the Vesuvius Challenge team publishes with no setup, or bring your own prepared dataset; maps, annotations, credentials and machine settings stay outside this repository.
 
 ![The viewer browsing the official Vesuvius Challenge ink maps, read straight from the open-data bucket](docs/images/ui-overview.jpg)
 
@@ -27,6 +27,8 @@ Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cl
 The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not train models or render 3D meshes; inference runs only through the optional ink-sdk integration, and CT is read only for cross-sections. Missing scores and calibration remain unknown.
 
 ![Cross-sections: the mesh on its sheet (left) and cutting across the layers (right)](docs/images/cross-sections.jpg)
+
+![Labeling ink (green) and reviewed non-ink (red) on a full-resolution official map](docs/images/annotate.jpg)
 
 <details>
 <summary><b>How it helps when hunting for letters</b></summary>
@@ -74,7 +76,7 @@ ink-viewer --source /absolute/path/to/dataset \
   --annotations "$HOME/ink-viewer-annotations"
 ```
 
-Omitting `--annotations` disables server saves; browser-local editing and downloads remain available. Browser storage is not a backup. Saves go to the configured folder on the server, even when maps come from S3; the source bucket is not modified.
+Omitting `--annotations` disables server saves; browser-local editing and downloads remain available. Browser storage is not a backup. Saves go to the configured folder on the server, even when maps come from S3; the source bucket is not modified. Add `--annotations-hf user/dataset` to also mirror each saved pair to a private Hugging Face dataset ([details](docs/guide.md#mirror-annotations-to-hugging-face)).
 
 Masks retain the original image grid. Binary-pair, ink-only and tri-state imports have different meanings for unknown pixels; read [annotation formats and integrity](docs/guide.md#annotation-formats-and-integrity) before exchanging labels.
 
@@ -99,6 +101,14 @@ ink-viewer --source official
 The first start takes a few seconds to build the index from the bucket's `metadata.json`; see [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps).
 
 ## Data sources
+
+### Official Vesuvius Challenge maps
+
+```sh
+ink-viewer --source official
+```
+
+Indexes every ink map in the public open-data bucket from its `metadata.json` (no credentials, no manifest to prepare) and refreshes the index daily. Maps too large to label in a browser open as a reduced, browse-only view. See [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps).
 
 <details>
 <summary><b>Public S3 or HTTP, without credentials</b></summary>
