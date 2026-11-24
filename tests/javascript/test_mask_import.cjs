@@ -94,11 +94,17 @@ async function main() {
   assert.equal(await elements['#impFile'].onchange({target:{files:[f],value:'file'}}),false,'ink-only mode rejects gray 128 instead of guessing');
   binaryInk.name='c019_supervision_mask.png';
   assert.equal(await elements['#impFile'].onchange({target:{files:[binaryInk],value:'file'}}),false,'supervision layer cannot masquerade as ink-only');
+  binaryInk.name='c019_supervision_mask (2).png';
+  assert.equal(await elements['#impFile'].onchange({target:{files:[binaryInk],value:'file'}}),false,'a browser-renamed supervision layer cannot masquerade either');
   const inkFile=png(pixels([0,0,255])),supFile=png(pixels([255,0,255]));
   inkFile.name='sheet_inklabels.png';supFile.name='sheet_supervision_mask.png';
   ctx.formatoImportacion.value='par';
   assert.equal(await elements['#impFile'].onchange({target:{files:[supFile,inkFile],value:'file'}}),true,'pair order follows class filenames');
   assert.deepEqual(Array.from(c.image.data),Array.from(tri.data),'pair importer preserves unknown background');
+  inkFile.name='sheet_inklabels (1).png';supFile.name='sheet_supervision_mask (1).png';
+  assert.equal(await elements['#impFile'].onchange({target:{files:[supFile,inkFile],value:'file'}}),true,'a re-downloaded pair renamed by the browser still imports');
+  assert.deepEqual(Array.from(c.image.data),Array.from(tri.data));
+  inkFile.name='sheet_inklabels.png';supFile.name='sheet_supervision_mask.png';
   let calls=0;ctx.window.corridaDePNG=()=>({...info,par_id:++calls===1?'first':'second'});
   assert.equal(await elements['#impFile'].onchange({target:{files:[inkFile,supFile],value:'file'}}),false,'mixed pair generations are rejected');
   assert.deepEqual(Array.from(c.image.data),Array.from(tri.data));
