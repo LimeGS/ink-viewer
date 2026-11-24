@@ -1033,12 +1033,12 @@ def main():
     ap.add_argument('--raiz', default=os.environ.get('VISOR_RAIZ'),
                     help='docroot con all-gallery/ y los indices (VISOR_RAIZ; por defecto el directorio actual)')
     ap.add_argument('--dry-run', action='store_true', help='imprime lo resuelto (JSON) y sale sin abrir el puerto ni tocar la red')
-    ap.add_argument('--origen', default=os.environ.get('VISOR_ORIGEN'), help='carpeta local, URL HTTP/HTTPS o s3://bucket/prefijo; sin fallback a otro origen')
-    ap.add_argument('--anotaciones', default=os.environ.get('VISOR_ANOTACIONES', ''), help='carpeta local separada para mascaras; omitida = solo lectura')
-    ap.add_argument('--s3-perfil', default=os.environ.get('VISOR_S3_PERFIL', ''), help='perfil AWS; omitido = credenciales estandar del SDK')
+    ap.add_argument('--origen', '--source', dest='origen', default=os.environ.get('VISOR_ORIGEN'), help='dataset root: local folder, HTTP/HTTPS URL or s3://bucket/prefix; no fallback to another source')
+    ap.add_argument('--anotaciones', '--annotations', dest='anotaciones', default=os.environ.get('VISOR_ANOTACIONES', ''), help='separate local folder for saved masks; omitted = read-only')
+    ap.add_argument('--s3-perfil', '--s3-profile', dest='s3_perfil', default=os.environ.get('VISOR_S3_PERFIL', ''), help='AWS profile; omitted = the standard SDK credential chain')
     ap.add_argument('--s3-endpoint', default=os.environ.get('VISOR_S3_ENDPOINT', ''), help='endpoint HTTP/HTTPS de un S3 compatible, por ejemplo MinIO')
     ap.add_argument('--s3-region', default=os.environ.get('VISOR_S3_REGION', ''), help='region del origen S3')
-    ap.add_argument('--ct-origen', default=os.environ.get('VISOR_CT_ORIGEN', ''),
+    ap.add_argument('--ct-origen', '--ct-source', dest='ct_origen', default=os.environ.get('VISOR_CT_ORIGEN', ''),
                     help='where cross-sections read meshes and CT when the map source lacks them: a root holding PHerc... '
                          'folders, e.g. https://vesuvius-challenge-open-data.s3.amazonaws.com (read-only)')
     ap.add_argument('--config', default=os.environ.get('VISOR_CONFIG', str(Path.home() / '.config/vesuvius-visor/config.json')), help='archivo JSON que recuerda el origen elegido desde el visor')

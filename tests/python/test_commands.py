@@ -48,6 +48,8 @@ class Commands(unittest.TestCase):
         self.assertEqual(info['raiz'],str(self.data))
         for args in ([*flags,'--raiz',str(self.data)],[*flags,'--s3-endpoint','invalid']):
             with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit):self.invoke(proxy,args)
+        english=json.loads(self.invoke(proxy,['--config',str(cfg),'--source',str(self.data),'--annotations',str(annotations),'--dry-run']))
+        self.assertEqual(english['origen'],str(self.data));self.assertTrue(english['escritura'])
         with patch.object(proxy,'main') as main,patch.object(sys,'argv',['ink-viewer']):
             runpy.run_module('ink_viewer',run_name='__main__');main.assert_called_once()
 

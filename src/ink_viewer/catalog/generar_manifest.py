@@ -186,15 +186,15 @@ def construir(source, scroll=None, verificar_mallas=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--origen', required=True, help='sample folder, catalog root or s3://bucket/prefix')
+    ap.add_argument('--origen', '--source', dest='origen', required=True, help='sample folder, catalog root or s3://bucket/prefix')
     ap.add_argument('--scroll', help='explicit sample for a renamed folder, or catalog filter')
-    ap.add_argument('--salida', help='local root for _viewer/ outputs; required for S3 (then publish both files yourself)')
-    ap.add_argument('--s3-perfil', default='')
+    ap.add_argument('--salida', '--output', dest='salida', help='local root for _viewer/ outputs; required for S3 (then publish both files yourself)')
+    ap.add_argument('--s3-perfil', '--s3-profile', dest='s3_perfil', default='')
     ap.add_argument('--s3-endpoint', default='')
     ap.add_argument('--s3-region', default='')
-    ap.add_argument('--verificar-mallas', action='store_true', help='read/hash mesh inputs against render receipts; may be expensive')
+    ap.add_argument('--verificar-mallas', '--verify-meshes', dest='verificar_mallas', action='store_true', help='read/hash mesh inputs against render receipts; may be expensive')
     ap.add_argument('--dry-run', action='store_true', help='scan and print counts, without writing')
-    ap.add_argument('--reemplazar', action='store_true', help='explicitly replace an existing generated index')
+    ap.add_argument('--reemplazar', '--replace', dest='reemplazar', action='store_true', help='explicitly replace an existing generated index')
     a = ap.parse_args(argv)
     try:
         source = Fuente(a.origen, a.s3_perfil, a.s3_endpoint, a.s3_region)
