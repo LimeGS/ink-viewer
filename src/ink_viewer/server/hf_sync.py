@@ -6,7 +6,6 @@ in a background thread, so drawing never waits on the network; a failed push is 
 retried with the next save. The token comes from HF_TOKEN or ``hf auth login`` and never reaches the browser.
 A dataset that does not exist yet is created private.
 """
-import io
 import queue
 import threading
 import time
@@ -60,7 +59,8 @@ class HFSync:
                 if not files:
                     continue
                 try:
-                    operations = [self.operation(path_in_repo=p, path_or_fileobj=io.BytesIO(b)) for p, b in sorted(files.items())]
+                    # Raw bytes, not BytesIO: huggingface_hub sends buffered IO through the slower HTTP path instead of Xet.
+                    operations = [self.operation(path_in_repo=p, path_or_fileobj=b) for p, b in sorted(files.items())]
                     self.api.create_commit(self.repo, repo_type='dataset', operations=operations, commit_message=message)
                     with self._lock:
                         self.status.update(pushed=self.status['pushed'] + len(files), last_error=None,

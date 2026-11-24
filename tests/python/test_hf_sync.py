@@ -12,7 +12,8 @@ from test_fuentes import servidor
 
 class Op:
     def __init__(self, path_in_repo, path_or_fileobj):
-        self.path, self.body = path_in_repo, path_or_fileobj.read()
+        assert isinstance(path_or_fileobj, bytes), 'buffered IO would bypass Xet'
+        self.path, self.body = path_in_repo, path_or_fileobj
 
 
 class FakeApi:
