@@ -10,7 +10,7 @@ By Leonel Wainer and Paulo Sergio Camillo. The visual front end of [ink-sdk](htt
 
 Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cloud provider is required. Bring your own prepared dataset; maps, annotations, credentials and machine settings stay outside this repository.
 
-![The viewer comparing two ink models on a PHerc0841 segment](docs/images/ui-overview.jpg)
+![The viewer browsing the official Vesuvius Challenge ink maps, read straight from the open-data bucket](docs/images/ui-overview.jpg)
 
 ## Features
 
@@ -21,6 +21,8 @@ Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cl
 - Browse with lazy thumbnails and previews; annotate on the full-resolution original raster.
 - Run a public ink model on the open segment through [ink-sdk](https://github.com/LimeGS/ink-sdk) (optional) and add its maps to the list.
 - Click a map point to see the CT cross-section through it, with the segment's mesh drawn on top (optional).
+- Browse every ink map the Vesuvius Challenge team publishes, indexed from the open-data bucket's own catalog and refreshed daily; gigapixel maps open as a reduced, browse-only view.
+- Mirror saved annotations to a Hugging Face dataset (optional).
 
 The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not train models or render 3D meshes; inference runs only through the optional ink-sdk integration, and CT is read only for cross-sections. Missing scores and calibration remain unknown.
 
@@ -87,6 +89,14 @@ ink-viewer --source https://huggingface.co/datasets/pscamillo/ink-viewer-sample/
 ```
 
 Open http://127.0.0.1:8797. The Greek letters show in the `-order-a` maps; switch to `-order-b` to see what the same models give with the depth order flipped. See the [dataset card](https://huggingface.co/datasets/pscamillo/ink-viewer-sample) for credits and licence (CC BY-NC 4.0).
+
+To browse every ink map the team has published instead (around 700 maps from 14 scrolls, read straight from the public bucket, no credentials):
+
+```sh
+ink-viewer --source official
+```
+
+The first start takes a few seconds to build the index from the bucket's `metadata.json`; see [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps).
 
 ## Data sources
 
