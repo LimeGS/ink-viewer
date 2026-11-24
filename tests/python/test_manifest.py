@@ -87,7 +87,7 @@ class Manifest(unittest.TestCase):
                 with self.assertRaises(SystemExit): main(['--origen', str(sample)])
                 self.assertEqual((sample / '_viewer/manifest.json').read_bytes(), original)
                 (sample / 'segments/shared/ink-detection' / (stem + '-c+02.png')).unlink()
-                main(['--origen', str(sample), '--reemplazar'])
+                main(['--source', str(sample), '--replace'])
                 self.assertEqual(json.loads((sample / '_viewer/index-info.json').read_text())['depths'], 1)
 
     def test_proxy_local_http_and_tiff(self):
