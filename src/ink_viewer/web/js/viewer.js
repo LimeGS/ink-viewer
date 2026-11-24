@@ -136,7 +136,16 @@ function show(reset=false){if(!group)return;if(pintar)release();if(!group.catalo
  if(!dir){$('notice').textContent='This centre is not available yet';im.hidden=true;$('download').removeAttribute('href');return}
  const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();
  loader.onload=()=>{if(token!==request)return;let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px';if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
- loader.onerror=()=>{if(token!==request)return;cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
+ /* 24-nov: a TIFF map too large for full resolution in a browser (official whole segments reach gigapixels) opens as a
+    reduced, browse-only view: the 1/4 map, or the published 1/8 JPEG. fullresReady stays 0, so labeling stays locked. */
+ const reduced=()=>{if(token!==request)return;const W=loader.naturalWidth,H=loader.naturalHeight,changed=im.naturalWidth!==W||im.naturalHeight!==H;
+  im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
+  im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=loader.src;
+  $('notice').hidden=false;$('notice').textContent='Reduced view: this map is too large for full resolution in a browser. Browse only; labeling is off.';
+  im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
+ loader.onerror=()=>{if(token!==request)return;
+  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;loader.src=mapUrl(dir,$('contrast').value,4);return}
+  cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
 }
 /* multi-rollo (29-sep): all selection paths switch context without unloading the viewer. */
 function irARollo(rollo){
