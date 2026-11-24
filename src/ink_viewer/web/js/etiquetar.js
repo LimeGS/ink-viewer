@@ -450,12 +450,12 @@ conectar('#impFile', 'onchange', async e => {
     if (!d || !files.length || !mascaraLista()) return false;
     let ordered;
     if (format === 'par') {
-      ordered = ['inklabels','supervision_mask'].map(k => files.find(f => new RegExp('(?:^|_)' + k + '\\.png$','i').test(f.name)));
+      ordered = ['inklabels','supervision_mask'].map(k => files.find(f => new RegExp('(?:^|_)' + k + '(?: ?\\(\\d+\\))?\\.png$','i').test(f.name)));
       if (files.length !== 2 || ordered.some(f => !f) || ordered[0] === ordered[1]) throw new Error('Select one inklabels.png and its matching supervision_mask.png');
     } else if (format === 'tri' || format === 'ink') {
       if (files.length !== 1) throw new Error('Select one PNG for this mask format');
-      if (/(?:inklabels|supervision_mask)\.png$/i.test(files[0].name) && format === 'tri') throw new Error('A binary ink mask needs PNG pair or the explicit ink-only format');
-      if (/supervision_mask\.png$/i.test(files[0].name) && format === 'ink') throw new Error('A supervision mask is not an ink-only mask; select PNG pair');
+      if (/(?:inklabels|supervision_mask)(?: ?\(\d+\))?\.png$/i.test(files[0].name) && format === 'tri') throw new Error('A binary ink mask needs PNG pair or the explicit ink-only format');
+      if (/supervision_mask(?: ?\(\d+\))?\.png$/i.test(files[0].name) && format === 'ink') throw new Error('A supervision mask is not an ink-only mask; select PNG pair');
       ordered = files;
     } else throw new Error('Choose ink-only PNG, tri-state PNG or PNG pair before importing');
     let out;
