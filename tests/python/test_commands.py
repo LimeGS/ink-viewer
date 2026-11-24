@@ -50,6 +50,16 @@ class Commands(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit):self.invoke(proxy,args)
         english=json.loads(self.invoke(proxy,['--config',str(cfg),'--source',str(self.data),'--annotations',str(annotations),'--dry-run']))
         self.assertEqual(english['origen'],str(self.data));self.assertTrue(english['escritura'])
+        hf=['--config',str(cfg),'--source',str(self.data),'--annotations',str(annotations),'--annotations-hf','me/labels']
+        self.assertEqual(json.loads(self.invoke(proxy,[*hf,'--dry-run']))['annotations_hf'],'me/labels')
+        with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit):
+            self.invoke(proxy,['--config',str(cfg),'--source',str(self.data),'--annotations-hf','me/labels','--dry-run'])
+        with patch.object(proxy,'ThreadingHTTPServer') as factory,patch.object(proxy,'HFSync') as sync:
+            factory.return_value.serve_forever.side_effect=KeyboardInterrupt
+            self.invoke(proxy,hf);sync.assert_called_once_with('me/labels')
+            self.assertIs(factory.return_value.hf_sync,sync.return_value)
+            sync.side_effect=RuntimeError('no token')
+            with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit):self.invoke(proxy,hf)
         with patch.object(proxy,'main') as main,patch.object(sys,'argv',['ink-viewer']):
             runpy.run_module('ink_viewer',run_name='__main__');main.assert_called_once()
 
