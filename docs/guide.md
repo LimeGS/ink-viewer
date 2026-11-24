@@ -3,6 +3,7 @@
 Detailed reference for dataset publishers, self-hosted deployments and contributors. Start with the [README](../README.md) for installation and everyday use.
 
 - [Prepare a dataset](#prepare-a-dataset)
+- [Browse the official Vesuvius Challenge maps](#browse-the-official-vesuvius-challenge-maps)
 - [Connect to public S3](#connect-to-public-s3)
 - [Authenticated S3 and compatible storage](#authenticated-s3-and-compatible-storage)
 - [Configuration](#configuration)
@@ -76,6 +77,16 @@ dataset/
 ```
 
 Catalog-owned metadata can live under `_viewer/` instead. `metadata.json` uses `scroll` and optional `TABLA`, `CAND`, `MODNOM`, `MODCORTO`, `CONTAM`, `CONTAM_SOLAPE`, `CONTAM_TXT`, `ORIENT`, `POS`, `PAR` and `PAR_EXTRA` fields. Contamination maps contain arrays of sheet IDs. Missing scores, calibration or orientation must remain unknown. Preserve the producer's original metadata and receipts when moving a dataset.
+
+## Browse the official Vesuvius Challenge maps
+
+`--source official` opens every ink map the team publishes in the open-data bucket, with no download and no credentials:
+
+```sh
+ink-viewer --source official
+```
+
+The index comes from the bucket's own `metadata.json` (the team's catalog of samples, segments and data items). On start, and when the cached copy is older than `VISOR_OFFICIAL_MAX_AGE_HOURS` (default 24), the server downloads it, keeps one entry per `ink-detection` item with its model, volume and direction, and caches the result under `VISOR_OFFICIAL_CACHE` (default `~/.cache/ink-viewer/official`). New team runs therefore appear on the next refresh; if a refresh fails, the previous index is kept. Maps are read from the bucket over HTTPS; 1/8-scale views use the JPEG the team publishes beside each map instead of decoding the full-resolution TIFF. Mesh association is reported as unverified. Annotations work as with any other source when `--annotations` is given.
 
 ## Connect to public S3
 
@@ -173,7 +184,7 @@ Keep the Spanish field and flag names shown here; they are the current CLI/API n
 
 | CLI option | Environment variable | Purpose |
 | --- | --- | --- |
-| `--origen` | `VISOR_ORIGEN` | Local folder, HTTP/HTTPS root or S3 prefix |
+| `--origen` | `VISOR_ORIGEN` | Local folder, HTTP/HTTPS root, S3 prefix or `official` |
 | `--anotaciones` | `VISOR_ANOTACIONES` | Separate local annotation directory |
 | `--s3-perfil` | `VISOR_S3_PERFIL` | AWS SDK profile name |
 | `--s3-endpoint` | `VISOR_S3_ENDPOINT` | S3-compatible service endpoint |

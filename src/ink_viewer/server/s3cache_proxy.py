@@ -549,6 +549,12 @@ class Handler(SimpleHTTPRequestHandler):
     def _mapa_tiff(self, rel, scale, head=False):
         if scale not in (1, 4, 8) or not re.fullmatch(r'catalog/[^/]+/segments/[^/]+/ink-detection/[^/]+\.tiff?', rel, re.I):
             raise ValueError('Ruta TIFF o escala invalida')
+        # The official bucket publishes a 1/8 JPEG beside each map: thumbnails need not download the full TIFF.
+        preview = getattr(self.fuente, 'preview', None)
+        jpg = preview(self.fuente.ruta_catalogo(rel), scale) if preview else None
+        if jpg:
+            with self.fuente.abrir(jpg, head=head) as (status, headers, body):
+                return self._fuente_stream(status, headers, body, head)
         from PIL import Image
         # Only decode a requested 2D ink map, never CT volumes or TIFXYZ mesh coordinates.
         with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as image_file:
@@ -1033,7 +1039,7 @@ def main():
     ap.add_argument('--raiz', default=os.environ.get('VISOR_RAIZ'),
                     help='docroot con all-gallery/ y los indices (VISOR_RAIZ; por defecto el directorio actual)')
     ap.add_argument('--dry-run', action='store_true', help='imprime lo resuelto (JSON) y sale sin abrir el puerto ni tocar la red')
-    ap.add_argument('--origen', '--source', dest='origen', default=os.environ.get('VISOR_ORIGEN'), help='dataset root: local folder, HTTP/HTTPS URL or s3://bucket/prefix; no fallback to another source')
+    ap.add_argument('--origen', '--source', dest='origen', default=os.environ.get('VISOR_ORIGEN'), help='dataset root: local folder, HTTP/HTTPS URL, s3://bucket/prefix, or "official" for the Vesuvius Challenge open-data bucket; no fallback to another source')
     ap.add_argument('--anotaciones', '--annotations', dest='anotaciones', default=os.environ.get('VISOR_ANOTACIONES', ''), help='separate local folder for saved masks; omitted = read-only')
     ap.add_argument('--s3-perfil', '--s3-profile', dest='s3_perfil', default=os.environ.get('VISOR_S3_PERFIL', ''), help='AWS profile; omitted = the standard SDK credential chain')
     ap.add_argument('--s3-endpoint', default=os.environ.get('VISOR_S3_ENDPOINT', ''), help='endpoint HTTP/HTTPS de un S3 compatible, por ejemplo MinIO')
