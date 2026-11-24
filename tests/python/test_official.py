@@ -8,6 +8,7 @@ import os
 import tempfile
 import threading
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 from unittest.mock import patch
@@ -18,6 +19,7 @@ import ink_viewer.server.s3cache_proxy as p
 from ink_viewer.catalog.official_index import BUCKET, construir_oficial
 from ink_viewer.server.fuente_oficial import FuenteOficial
 from ink_viewer.server.fuentes import Fuente
+from ink_viewer.server.tiff_header import tiff_dims
 
 SEG = '20261007213123-concat_w047-w048'
 NAME = 'PHerc0343-20261007213123-8.64um-1.2m-116keV-volume-20250521140437-20261117205746-argus-v3-tile384-stride192'
@@ -104,6 +106,46 @@ class OfficialIndex(unittest.TestCase):
             construir_oficial({'models': {}})
 
 
+class TiffHeader(unittest.TestCase):
+    def test_dims_from_header_only(self):
+        import numpy as np, tifffile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); source = Fuente(tmp)
+            Image.new('L', (37, 21)).save(root / 'pil.tif', compression='tiff_deflate')
+            tifffile.imwrite(root / 'big.tif', np.zeros((9, 13), np.uint8), bigtiff=True)
+            tifffile.imwrite(root / 'mm.tif', np.zeros((5, 300), np.uint16), byteorder='>')
+            (root / 'no.tif').write_bytes(b'not a tiff at all')
+            (root / 'odd.tif').write_bytes(b'II' + (99).to_bytes(2, 'little') + bytes(12))
+            (root / 'tagless.tif').write_bytes(b'II*\x00\x08\x00\x00\x00' + (1).to_bytes(2, 'little') + bytes(12) + bytes(4))
+            self.assertEqual(tiff_dims(source, 'pil.tif'), (37, 21))
+            self.assertEqual(tiff_dims(source, 'big.tif'), (13, 9))
+            self.assertEqual(tiff_dims(source, 'mm.tif'), (300, 5))
+            for bad in ('no.tif', 'odd.tif', 'tagless.tif'):
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    tiff_dims(source, bad)
+
+
+class TiffHeaderOverHttp(unittest.TestCase):
+    def test_servers_that_ignore_range(self):
+        import ink_viewer.server.tiff_header as th
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            Image.new('L', (37, 21)).save(root / 'pil.tif')
+            (root / 'short.tif').write_bytes(b'II*\x00' + (1000).to_bytes(4, 'little') + bytes(8))
+
+            class Plain(http.server.SimpleHTTPRequestHandler):  # answers 200 with the whole file, ignoring Range
+                def __init__(self, *a, **kw): super().__init__(*a, directory=tmp, **kw)
+                def log_message(self, *a): pass
+
+            with servidor(Plain) as url:
+                source = Fuente(url)
+                self.assertEqual(tiff_dims(source, 'pil.tif'), (37, 21))
+                with self.assertRaises(ValueError):
+                    tiff_dims(source, 'short.tif')
+                with patch.object(th, 'SKIP_LIMIT', 4), self.assertRaises(ValueError):
+                    tiff_dims(source, 'pil.tif')
+
+
 class OfficialSource(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); root = Path(self.tmp.name)
@@ -150,6 +192,25 @@ class OfficialSource(unittest.TestCase):
             warnings.simplefilter('error')  # a server where warnings are errors must still decode a 3200-pixel map
             with urllib.request.urlopen(base + f'/api/mapa/catalog/{TIF}?escala=4') as response:
                 self.assertEqual(Image.open(response).size, (20, 10))
+
+    def test_size_limits_choose_full_preview_or_refusal(self):
+        source = Fuente('official'); source.verificar()
+        big = TIF.replace('.tif', '-big.tif')  # a second map without a published preview
+        Image.new('L', (80, 40), 5).save(self.bucket / big)
+        with servidor(p.Handler, source) as base:
+            with urllib.request.urlopen(base + f'/api/dims/catalog/{TIF}') as response:
+                self.assertEqual(json.loads(response.read()), {'w': 80, 'h': 40})
+            with patch.object(p, 'FULLRES_PIXELS', 1000), patch.object(p, 'MAP_PIXELS', 2000):
+                for path in (f'/api/mapa/catalog/{TIF}?escala=1', f'/api/mapa/catalog/{big}?escala=4'):
+                    with self.subTest(path=path), self.assertRaises(urllib.error.HTTPError) as error:
+                        urllib.request.urlopen(base + path)
+                    self.assertEqual(error.exception.code, 400)
+                    self.assertIn(b'too large', error.exception.read())
+                with urllib.request.urlopen(base + f'/api/mapa/catalog/{TIF}?escala=4') as response:
+                    self.assertEqual(Image.open(io.BytesIO(response.read())).format, 'JPEG', 'too large to decode: the published preview')
+            with patch.object(p, 'FULLRES_PIXELS', 1000), patch.object(p, 'MAP_PIXELS', 4000):
+                with urllib.request.urlopen(base + f'/api/mapa/catalog/{TIF}?escala=4') as response:
+                    self.assertEqual(Image.open(io.BytesIO(response.read())).size, (20, 10), 'decodable: the real 1/4 map')
 
     def test_refresh_policy(self):
         source = Fuente('official')

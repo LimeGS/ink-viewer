@@ -11,7 +11,7 @@ CAMPANA_S3, S3CACHE_BUCKET/S3CACHE_PROFILE and CATALOG_WRITER_TOKEN. Its externa
 writer does not support atomic annotation pairs; configure local annotations.
 """
 import argparse, base64, binascii, io, json, os, re, secrets, shutil, struct, tempfile, threading, time, urllib.error, urllib.request
-import gzip, hashlib
+import gzip, hashlib, math
 from functools import lru_cache
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -21,6 +21,16 @@ import ink_viewer.server.canonical_masks as canonical
 import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.inksdk_job as inksdk
 import ink_viewer.server.corte as corte
+from ink_viewer.server.tiff_header import tiff_dims
+
+# Largest TIFF map decoded on the server, and largest sent at full resolution (a browser cannot hold gigapixel images;
+# larger maps open as a reduced, browse-only view).
+MAP_PIXELS = int(float(os.environ.get('VISOR_MAX_MAP_PIXELS') or 1e9))
+FULLRES_PIXELS = int(float(os.environ.get('VISOR_MAX_FULLRES_PIXELS') or 4e8))
+
+
+class MapTooLarge(ValueError):
+    pass
 
 from ink_viewer.paths import WEB_ROOT, web_asset
 
@@ -549,20 +559,36 @@ class Handler(SimpleHTTPRequestHandler):
     def _mapa_tiff(self, rel, scale, head=False):
         if scale not in (1, 4, 8) or not re.fullmatch(r'catalog/[^/]+/segments/[^/]+/ink-detection/[^/]+\.tiff?', rel, re.I):
             raise ValueError('Ruta TIFF o escala invalida')
-        # The official bucket publishes a 1/8 JPEG beside each map: thumbnails need not download the full TIFF.
+        source_rel = self.fuente.ruta_catalogo(rel)
         preview = getattr(self.fuente, 'preview', None)
-        jpg = preview(self.fuente.ruta_catalogo(rel), scale) if preview else None
-        if jpg:
+
+        def published(jpg):
             with self.fuente.abrir(jpg, head=head) as (status, headers, body):
                 return self._fuente_stream(status, headers, body, head)
+
+        # The official bucket publishes a 1/8 JPEG beside each map: thumbnails need not download the full TIFF.
+        jpg = preview(source_rel, 8) if preview and scale == 8 else None
+        if jpg:
+            return published(jpg)
+        try:
+            pixels = math.prod(tiff_dims(self.fuente, source_rel))
+        except (ValueError, OSError, struct.error):
+            pixels = None  # unknown size: decode as before and let Pillow's limit decide
+        if pixels and scale > 1 and pixels > MAP_PIXELS:
+            # Too large to decode here: a 1/4 request (always a preview) gets the published 1/8 JPEG when there is one.
+            jpg = preview(source_rel, 8) if preview else None
+            if jpg:
+                return published(jpg)
+        if pixels and (pixels > FULLRES_PIXELS if scale == 1 else pixels > MAP_PIXELS):
+            raise MapTooLarge(f'Map too large for this scale: {pixels / 1e6:.0f} Mpx at 1/{scale}')
         import warnings
         from PIL import Image
         # Whole-segment maps reach a few hundred megapixels (an official 2.4 um map is 14760 x 18520); allow them as
         # canonical_masks and the Vast catalog do. The byte cap below still bounds what is read.
-        Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, 1_000_000_000)
+        Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, MAP_PIXELS)
         # Only decode a requested 2D ink map, never CT volumes or TIFXYZ mesh coordinates.
         with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as image_file:
-            with self.fuente.abrir(self.fuente.ruta_catalogo(rel)) as (_, _, body):
+            with self.fuente.abrir(source_rel) as (_, _, body):
                 total = 0
                 for block in iter(lambda: body.read(2**20), b''):
                     total += len(block)
@@ -710,6 +736,9 @@ class Handler(SimpleHTTPRequestHandler):
                 if generated:
                     with generated.open('rb') as body:
                         hdr = body.read(24)
+                elif re.search(r'\.tiff?$', path, re.I):
+                    w, h = tiff_dims(self.fuente, self.fuente.ruta_catalogo(path[len('api/dims/'):]))
+                    return self._json({'w': w, 'h': h})
                 else:
                     with self.fuente.abrir(self.fuente.ruta_catalogo(path[len('api/dims/'):]), rango='bytes=0-23') as (_, _, body):
                         hdr = body.read(24)
