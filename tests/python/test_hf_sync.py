@@ -66,9 +66,9 @@ class SavedPairs(unittest.TestCase):
         self.assertTrue(sync.flush())
         (repo, kind, files, message), = api.commits
         self.assertEqual((repo, kind, message), ('me/labels', 'dataset', 'Annotations: lam, depth 4'))
-        self.assertEqual(sorted(files), sorted(self.source.id + '/' + c for c in saved['claves']))
-        local = self.source.mascara_local('catalog/' + saved['clave_profundidad'])
-        self.assertEqual(files[self.source.id + '/' + saved['clave_profundidad']], local.read_bytes())
+        self.assertEqual(sorted(files), sorted(self.source.id + '/catalog/' + c for c in saved['claves']))
+        for path, body in files.items():  # same paths and bytes as the local annotations folder
+            self.assertEqual((self.annotations / path).read_bytes(), body, path)
 
 
 if __name__ == '__main__':

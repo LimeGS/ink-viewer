@@ -969,9 +969,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.fuente.guardar_par(directories, files)
             claves = [directory.removeprefix('catalog/') + '/' + name for directory in dict.fromkeys(directories) for name in files]
             sync = getattr(self.server, 'hf_sync', None)
-            if sync:  # mirror after the local write; the local folder stays the source of truth
-                prefix = 'official' if self.fuente.config().get('origen') == 'official' else self.fuente.id
-                sync.submit({prefix + '/' + clave: files[clave.rsplit('/', 1)[1]] for clave in claves},
+            if sync:  # mirror after the local write, at the same paths as <annotations>/; the local folder stays the source of truth
+                sync.submit({f'{self.fuente.id}/{directory}/{name}': body for directory in dict.fromkeys(directories) for name, body in files.items()},
                             f'Annotations: {lamina}, depth {depth}')
             return self._json({'ok': True, 'destino': 'anotaciones-locales', 'hf': sync.repo if sync else None, 'claves': claves,
                                'clave': claves[0], 'clave_profundidad': folder.removeprefix('catalog/') + '/' + lamina + '_inklabels.png'})

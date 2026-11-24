@@ -322,7 +322,7 @@ Annotations use the **full-resolution original raster**. Previews are browsing a
 
 ### Mirror annotations to Hugging Face
 
-`--annotations-hf user/dataset` (with `--annotations`) also pushes every saved mask pair to a Hugging Face dataset, one commit per save: inklabels, supervision mask and the provenance JSON, at the same paths as in the local folder, under the source id (`official/` for the official source). The local folder stays the source of truth: the pair is validated and written there first, and the push runs in the background, so a slow or failed push never loses a save; failed files go out with the next one, and `/api/origen` reports the mirror's state. Install with `pip install "ink-viewer[hf]"`; the token comes from `HF_TOKEN` or `hf auth login` and stays on the server. A dataset that does not exist yet is created private.
+`--annotations-hf user/dataset` (with `--annotations`) also pushes every saved mask pair to a Hugging Face dataset, one commit per save: inklabels, supervision mask and the provenance JSON, at the same paths as in the local annotations folder, so a downloaded copy can be used as `--annotations` directly. The local folder stays the source of truth: the pair is validated and written there first, and the push runs in the background, so a slow or failed push never loses a save; failed files go out with the next one, and `/api/origen` reports the mirror's state. Install with `pip install "ink-viewer[hf]"`; the token comes from `HF_TOKEN` or `hf auth login` and stays on the server. A dataset that does not exist yet is created private.
 
 Choose the import format explicitly:
 
