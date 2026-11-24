@@ -78,6 +78,16 @@ Masks retain the original image grid. Binary-pair, ink-only and tri-state import
 
 </details>
 
+## Try it in two minutes
+
+No data of your own needed. After installing, open a small public sample: one crop of the PHerc0211 segment that won a First Letters prize, with maps from four ink models (Studio softloss, Argus V3, Reader V3, TRACE v3B) in both layer orders, plus the CT surface.
+
+```sh
+ink-viewer --source https://huggingface.co/datasets/pscamillo/ink-viewer-sample/resolve/main
+```
+
+Open http://127.0.0.1:8797. The Greek letters show in the `-order-a` maps; switch to `-order-b` to see what the same models give with the depth order flipped. See the [dataset card](https://huggingface.co/datasets/pscamillo/ink-viewer-sample) for credits and licence (CC BY-NC 4.0).
+
 ## Data sources
 
 <details>
