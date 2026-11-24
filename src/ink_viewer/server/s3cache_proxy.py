@@ -27,7 +27,8 @@ from ink_viewer.server.hf_sync import HFSync
 # Largest TIFF map decoded on the server, and largest sent at full resolution (a browser cannot hold gigapixel images;
 # larger maps open as a reduced, browse-only view).
 MAP_PIXELS = int(float(os.environ.get('VISOR_MAX_MAP_PIXELS') or 1e9))
-FULLRES_PIXELS = int(float(os.environ.get('VISOR_MAX_FULLRES_PIXELS') or 4e8))
+# 2**28 px is Chrome's largest canvas area; above it the label mask canvas cannot be created or encoded.
+FULLRES_PIXELS = int(float(os.environ.get('VISOR_MAX_FULLRES_PIXELS') or 2**28))
 
 
 class MapTooLarge(ValueError):
