@@ -6,6 +6,8 @@
 
 **Explore, compare and annotate 2D ink-detection maps from Vesuvius scroll datasets in your browser.**
 
+By Leonel Wainer and Paulo Sergio Camillo. The visual front end of [ink-sdk](https://github.com/LimeGS/ink-sdk): run any of its ink models on a segment from the viewer, compare the maps side by side, and check a suspected letter against the CT before trusting it.
+
 Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cloud provider is required. Bring your own prepared dataset; maps, annotations, credentials and machine settings stay outside this repository.
 
 ![The viewer comparing two ink models on a PHerc0841 segment](docs/images/ui-overview.jpg)
@@ -24,6 +26,16 @@ The frontend uses JavaScript, HTML and CSS; Python serves data and validates sav
 
 ![Cross-sections: the mesh on its sheet (left) and cutting across the layers (right)](docs/images/cross-sections.jpg)
 
+<details>
+<summary><b>How it helps when hunting for letters</b></summary>
+
+- **Compare models on the same segment.** Public ink models disagree, and a shape seen by one model only is weak evidence. Run several ink-sdk models (Reader V3, Argus V3, TRACE v3B, the A-hn seeds and others) on the open segment and flip between their maps without leaving the page.
+- **Check the layer order.** ink-sdk writes both depth directions; real ink shows up in one of them, while material texture and noise tend to look alike in both.
+- **Look under a mark before believing it.** Click a point to see the CT cross-section with the mesh drawn on it: a mark where the mesh leaves its sheet, crosses a gap or follows a crack is not ink.
+- **Turn what you see into labels.** Paint ink and reviewed non-ink on the full-resolution map and export the masks on the map's own grid, ready for fine-tuning.
+
+</details>
+
 ## Quick start
 
 Requires **Python 3.10+**, Git, macOS or Linux, and a current browser with Canvas and IndexedDB support. Node.js is needed only for development tests.
@@ -34,7 +46,7 @@ cd ink-viewer
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install .
-ink-viewer --origen /absolute/path/to/dataset
+ink-viewer --source /absolute/path/to/dataset
 ```
 
 Open **[http://127.0.0.1:8797/all-gallery/index.html](http://127.0.0.1:8797/all-gallery/index.html)**. Keep the process running; stop it with `Ctrl+C`. `python -m ink_viewer` is an equivalent entry point.
@@ -42,12 +54,12 @@ Open **[http://127.0.0.1:8797/all-gallery/index.html](http://127.0.0.1:8797/all-
 The dataset must have a compatible viewer manifest. For a local catalog containing `PHerc.../segments/<segment>/ink-detection/` with catalog-named PNG or single-page integer TIFF maps, inspect discovery and generate its index first:
 
 ```sh
-ink-viewer-manifest --origen /absolute/path/to/catalog --dry-run
-ink-viewer-manifest --origen /absolute/path/to/catalog
-ink-viewer --origen /absolute/path/to/catalog
+ink-viewer-manifest --source /absolute/path/to/catalog --dry-run
+ink-viewer-manifest --source /absolute/path/to/catalog
+ink-viewer --source /absolute/path/to/catalog
 ```
 
-This creates `_viewer/manifest.json` and `_viewer/index-info.json`, without rewriting maps. See [dataset layout and naming](docs/guide.md#prepare-a-dataset) for requirements and existing manifest formats.
+This creates `_viewer/manifest.json` and `_viewer/index-info.json`, without rewriting maps. The Spanish flag names (`--origen`, `--anotaciones`, `--s3-perfil`, `--ct-origen`) still work. See [dataset layout and naming](docs/guide.md#prepare-a-dataset) for requirements and existing manifest formats.
 
 <details>
 <summary><b>Save annotations</b></summary>
@@ -56,11 +68,11 @@ Create a separate local directory and supply it at startup:
 
 ```sh
 mkdir -p "$HOME/ink-viewer-annotations"
-ink-viewer --origen /absolute/path/to/dataset \
-  --anotaciones "$HOME/ink-viewer-annotations"
+ink-viewer --source /absolute/path/to/dataset \
+  --annotations "$HOME/ink-viewer-annotations"
 ```
 
-Omitting `--anotaciones` disables server saves; browser-local editing and downloads remain available. Browser storage is not a backup. Saves go to the configured folder on the server, even when maps come from S3; the source bucket is not modified.
+Omitting `--annotations` disables server saves; browser-local editing and downloads remain available. Browser storage is not a backup. Saves go to the configured folder on the server, even when maps come from S3; the source bucket is not modified.
 
 Masks retain the original image grid. Binary-pair, ink-only and tri-state imports have different meanings for unknown pixels; read [annotation formats and integrity](docs/guide.md#annotation-formats-and-integrity) before exchanging labels.
 
@@ -74,7 +86,7 @@ Masks retain the original image grid. Binary-pair, ink-only and tri-state import
 Use the dataset's HTTPS object endpoint, replacing the placeholders:
 
 ```sh
-ink-viewer --origen \
+ink-viewer --source \
   "https://YOUR_BUCKET.s3.YOUR_REGION.amazonaws.com/YOUR_DATASET_PREFIX"
 ```
 
@@ -86,11 +98,11 @@ Point to the indexed dataset root, not a PNG or AWS Console page. The index and 
 <summary><b>Authenticated S3 and compatible storage</b></summary>
 
 ```sh
-ink-viewer --origen s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
-  --s3-perfil research --s3-region YOUR_REGION
+ink-viewer --source s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
+  --s3-profile research --s3-region YOUR_REGION
 ```
 
-Omit `--s3-perfil` to use the standard SDK credential chain. Add `--s3-endpoint https://storage.example.org` for a compatible store. The current `s3://` mode uses SDK authentication; use HTTPS for anonymous public browsing.
+Omit `--s3-profile` to use the standard SDK credential chain. Add `--s3-endpoint https://storage.example.org` for a compatible store. The current `s3://` mode uses SDK authentication; use HTTPS for anonymous public browsing.
 
 </details>
 
