@@ -75,6 +75,13 @@ def fsync_ruta(path, root):
 
 
 class Fuente:
+    def __new__(cls, origen=None, *args, **kwargs):
+        # "official" is the Vesuvius Challenge open-data bucket, indexed from its metadata.json (fuente_oficial.py).
+        if cls is Fuente and isinstance(origen, str) and origen.strip().lower() == 'official':
+            from ink_viewer.server.fuente_oficial import FuenteOficial
+            cls = FuenteOficial
+        return super().__new__(cls)
+
     def __init__(self, origen, perfil='', endpoint='', region='', anotaciones=''):
         if not isinstance(origen, str) or not origen.strip():
             raise ValueError('Falta la carpeta o URL de origen')

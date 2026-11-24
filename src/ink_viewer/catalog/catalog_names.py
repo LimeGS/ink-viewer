@@ -10,7 +10,7 @@ VOLUMES = {'20250521151220': ('8.64', '1.2', '116')}
 MAP = re.compile(
     r'(?P<sample>PHerc[A-Za-z0-9]+|unknown)-(?P<segment>.+?)-'
     r'(?:(?P<res>\d+(?:\.\d+)?)um-(?:(?P<dist>\d+(?:\.\d+)?)m-)?'
-    r'(?P<kev>\d+)keV-volume-(?P<volume>\d{14})|volume-(?P<novolume>unknown))-'
+    r'(?P<kev>\d+)keV-volume-(?P<volume>\d{14})(?:-L(?P<level>\d+))?(?:-t(?P<transform>\d+))?|volume-(?P<novolume>unknown))-'
     r'(?P<run>\d{14}|\d{10})-(?P<model>[A-Za-z0-9_-]+?)-tile(?P<tile>\d+)-stride(?P<stride>\d+)'
     r'(?:-c(?P<centre>[+-]\d+))?(?P<glob>-global)?\.(?P<extension>png|tif|tiff)$', re.I)
 PREVIEW = re.compile(MAP.pattern.replace(r'\.(?P<extension>png|tif|tiff)$', r'-ds(?P<scale>\d+)\.jpg$'), re.I)

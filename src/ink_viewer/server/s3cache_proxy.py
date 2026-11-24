@@ -549,7 +549,17 @@ class Handler(SimpleHTTPRequestHandler):
     def _mapa_tiff(self, rel, scale, head=False):
         if scale not in (1, 4, 8) or not re.fullmatch(r'catalog/[^/]+/segments/[^/]+/ink-detection/[^/]+\.tiff?', rel, re.I):
             raise ValueError('Ruta TIFF o escala invalida')
+        # The official bucket publishes a 1/8 JPEG beside each map: thumbnails need not download the full TIFF.
+        preview = getattr(self.fuente, 'preview', None)
+        jpg = preview(self.fuente.ruta_catalogo(rel), scale) if preview else None
+        if jpg:
+            with self.fuente.abrir(jpg, head=head) as (status, headers, body):
+                return self._fuente_stream(status, headers, body, head)
+        import warnings
         from PIL import Image
+        # Whole-segment maps reach a few hundred megapixels (an official 2.4 um map is 14760 x 18520); allow them as
+        # canonical_masks and the Vast catalog do. The byte cap below still bounds what is read.
+        Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, 1_000_000_000)
         # Only decode a requested 2D ink map, never CT volumes or TIFXYZ mesh coordinates.
         with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as image_file:
             with self.fuente.abrir(self.fuente.ruta_catalogo(rel)) as (_, _, body):
@@ -560,7 +570,10 @@ class Handler(SimpleHTTPRequestHandler):
                         raise ValueError('Mapa TIFF mayor a 256 MiB: genera previews PNG')
                     image_file.write(block)
             image_file.seek(0)
-            with Image.open(image_file) as image:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', Image.DecompressionBombWarning)
+                image = Image.open(image_file)
+            with image:
                 if image.format != 'TIFF' or getattr(image, 'n_frames', 1) != 1 or image.mode == 'F':
                     raise ValueError('Se admite TIFF 2D entero; exporta los stacks o float a PNG')
                 if scale != 1:
@@ -1033,7 +1046,7 @@ def main():
     ap.add_argument('--raiz', default=os.environ.get('VISOR_RAIZ'),
                     help='docroot con all-gallery/ y los indices (VISOR_RAIZ; por defecto el directorio actual)')
     ap.add_argument('--dry-run', action='store_true', help='imprime lo resuelto (JSON) y sale sin abrir el puerto ni tocar la red')
-    ap.add_argument('--origen', '--source', dest='origen', default=os.environ.get('VISOR_ORIGEN'), help='dataset root: local folder, HTTP/HTTPS URL or s3://bucket/prefix; no fallback to another source')
+    ap.add_argument('--origen', '--source', dest='origen', default=os.environ.get('VISOR_ORIGEN'), help='dataset root: local folder, HTTP/HTTPS URL, s3://bucket/prefix, or "official" for the Vesuvius Challenge open-data bucket; no fallback to another source')
     ap.add_argument('--anotaciones', '--annotations', dest='anotaciones', default=os.environ.get('VISOR_ANOTACIONES', ''), help='separate local folder for saved masks; omitted = read-only')
     ap.add_argument('--s3-perfil', '--s3-profile', dest='s3_perfil', default=os.environ.get('VISOR_S3_PERFIL', ''), help='AWS profile; omitted = the standard SDK credential chain')
     ap.add_argument('--s3-endpoint', default=os.environ.get('VISOR_S3_ENDPOINT', ''), help='endpoint HTTP/HTTPS de un S3 compatible, por ejemplo MinIO')
