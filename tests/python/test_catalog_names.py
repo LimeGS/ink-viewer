@@ -11,6 +11,12 @@ class Names(unittest.TestCase):
         self.assertEqual(normalize('ink-detection/' + LEGACY), 'ink-detection/' + OFFICIAL)
         self.assertEqual(normalize(OFFICIAL), OFFICIAL)  # idempotent
 
+    def test_volume_pyramid_level(self):
+        # The open-data bucket names fine-scan maps after the volume level they were inferred on (e.g. -L1).
+        d = parse('PHerc0139-20250108000000-1.129um-0.22m-59keV-volume-20260413113053-L1-20260709123958-mrg20736-1um-s1z2-tile256-stride128.tif')
+        self.assertEqual((d['volume'], d['level'], d['run'], d['model']), ('20260413113053', '1', '20260709123958', 'mrg20736-1um-s1z2'))
+        self.assertIsNone(parse(OFFICIAL)['level'])
+
     def test_parse_fields(self):
         d = parse(OFFICIAL)
         self.assertEqual((d['segment'], d['model'], d['centre'], d['contrast'], d['kind'], d['official']),
