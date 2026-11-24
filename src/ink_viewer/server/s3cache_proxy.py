@@ -22,6 +22,7 @@ import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.inksdk_job as inksdk
 import ink_viewer.server.corte as corte
 from ink_viewer.server.tiff_header import tiff_dims
+from ink_viewer.server.hf_sync import HFSync
 
 # Largest TIFF map decoded on the server, and largest sent at full resolution (a browser cannot hold gigapixel images;
 # larger maps open as a reduced, browse-only view).
@@ -493,7 +494,8 @@ class Handler(SimpleHTTPRequestHandler):
         source = getattr(self.server, 'fuente', None)
         info = source.info() if source else {'tipo': 'legacy', 'id': '', 'origen': str(ROOT), 'anotaciones': '',
                                             'perfil': '', 'endpoint': '', 'region': '', 'escritura': False, 'atomic_pair': False}
-        return dict(info, canonical_masks=canonical.inventory(source) is not None, token=getattr(self.server, 'config_token', ''),
+        sync = getattr(self.server, 'hf_sync', None)
+        return dict(info, hf=sync.info() if sync else None, canonical_masks=canonical.inventory(source) is not None, token=getattr(self.server, 'config_token', ''),
                     config=str(getattr(self.server, 'config_path', '') or ''))
 
     def _cambiar_origen(self):
@@ -966,7 +968,11 @@ class Handler(SimpleHTTPRequestHandler):
             # All class, geometry and provenance validation completes before this first write.
             self.fuente.guardar_par(directories, files)
             claves = [directory.removeprefix('catalog/') + '/' + name for directory in dict.fromkeys(directories) for name in files]
-            return self._json({'ok': True, 'destino': 'anotaciones-locales', 'claves': claves,
+            sync = getattr(self.server, 'hf_sync', None)
+            if sync:  # mirror after the local write, at the same paths as <annotations>/; the local folder stays the source of truth
+                sync.submit({f'{self.fuente.id}/{directory}/{name}': body for directory in dict.fromkeys(directories) for name, body in files.items()},
+                            f'Annotations: {lamina}, depth {depth}')
+            return self._json({'ok': True, 'destino': 'anotaciones-locales', 'hf': sync.repo if sync else None, 'claves': claves,
                                'clave': claves[0], 'clave_profundidad': folder.removeprefix('catalog/') + '/' + lamina + '_inklabels.png'})
         except (ValueError, TypeError, binascii.Error) as error:
             return self._json({'error': str(error)}, 400)
@@ -1083,6 +1089,9 @@ def main():
     ap.add_argument('--ct-origen', '--ct-source', dest='ct_origen', default=os.environ.get('VISOR_CT_ORIGEN', ''),
                     help='where cross-sections read meshes and CT when the map source lacks them: a root holding PHerc... '
                          'folders, e.g. https://vesuvius-challenge-open-data.s3.amazonaws.com (read-only)')
+    ap.add_argument('--annotations-hf', default=os.environ.get('VISOR_ANNOTATIONS_HF', ''),
+                    help='also push each saved mask pair to this Hugging Face dataset (user/dataset, created private if absent); '
+                         'needs --annotations, which stays the source of truth; token from HF_TOKEN or `hf auth login`')
     ap.add_argument('--config', default=os.environ.get('VISOR_CONFIG', str(Path.home() / '.config/vesuvius-visor/config.json')), help='archivo JSON que recuerda el origen elegido desde el visor')
     a = ap.parse_args()
     config_path = Path(a.config).expanduser().resolve()
@@ -1109,6 +1118,9 @@ def main():
     except (ValueError, TypeError, OSError) as e:
         ap.error('--ct-origen: ' + str(e))
     info['ct_origen'] = ct_source.origen if ct_source else ''
+    if a.annotations_hf and not (source and source.anotaciones):
+        ap.error('--annotations-hf mirrors saved masks: it needs --annotations')
+    info['annotations_hf'] = a.annotations_hf
     if a.dry_run:
         print(json.dumps(info, indent=1, ensure_ascii=False))
         return
@@ -1124,6 +1136,12 @@ def main():
     srv.fuente, srv.config_path, srv.ct_fuente = source, config_path, ct_source
     srv.config_token, srv.config_lock = secrets.token_urlsafe(32), threading.Lock()
     srv.daemon_threads = True
+    if a.annotations_hf:
+        try:
+            srv.hf_sync = HFSync(a.annotations_hf)
+        except Exception as e:
+            ap.error('--annotations-hf: ' + str(e))
+        log(f'anotaciones espejadas en https://huggingface.co/datasets/{a.annotations_hf}')
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

@@ -186,6 +186,7 @@ Keep the Spanish field and flag names shown here; they are the current CLI/API n
 | --- | --- | --- |
 | `--origen` | `VISOR_ORIGEN` | Local folder, HTTP/HTTPS root, S3 prefix or `official` |
 | `--anotaciones` | `VISOR_ANOTACIONES` | Separate local annotation directory |
+| `--annotations-hf` | `VISOR_ANNOTATIONS_HF` | Also push each saved mask pair to a Hugging Face dataset (`user/dataset`) |
 | `--s3-perfil` | `VISOR_S3_PERFIL` | AWS SDK profile name |
 | `--s3-endpoint` | `VISOR_S3_ENDPOINT` | S3-compatible service endpoint |
 | `--s3-region` | `VISOR_S3_REGION` | S3 region |
@@ -318,6 +319,10 @@ Ported from the cross-section view of [Volumen](https://github.com/pscamillo/vol
 ## Annotation formats and integrity
 
 Annotations use the **full-resolution original raster**. Previews are browsing aids. Zoom, display filters, flips and transpose change the view, not the stored mask grid.
+
+### Mirror annotations to Hugging Face
+
+`--annotations-hf user/dataset` (with `--annotations`) also pushes every saved mask pair to a Hugging Face dataset, one commit per save: inklabels, supervision mask and the provenance JSON, at the same paths as in the local annotations folder, so a downloaded copy can be used as `--annotations` directly. The local folder stays the source of truth: the pair is validated and written there first, and the push runs in the background, so a slow or failed push never loses a save; failed files go out with the next one, and `/api/origen` reports the mirror's state. Install with `pip install "ink-viewer[hf]"`; the token comes from `HF_TOKEN` or `hf auth login` and stays on the server. A dataset that does not exist yet is created private.
 
 Choose the import format explicitly:
 
