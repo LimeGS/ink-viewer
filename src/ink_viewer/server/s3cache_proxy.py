@@ -555,7 +555,11 @@ class Handler(SimpleHTTPRequestHandler):
         if jpg:
             with self.fuente.abrir(jpg, head=head) as (status, headers, body):
                 return self._fuente_stream(status, headers, body, head)
+        import warnings
         from PIL import Image
+        # Whole-segment maps reach a few hundred megapixels (an official 2.4 um map is 14760 x 18520); allow them as
+        # canonical_masks and the Vast catalog do. The byte cap below still bounds what is read.
+        Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, 1_000_000_000)
         # Only decode a requested 2D ink map, never CT volumes or TIFXYZ mesh coordinates.
         with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as image_file:
             with self.fuente.abrir(self.fuente.ruta_catalogo(rel)) as (_, _, body):
@@ -566,7 +570,10 @@ class Handler(SimpleHTTPRequestHandler):
                         raise ValueError('Mapa TIFF mayor a 256 MiB: genera previews PNG')
                     image_file.write(block)
             image_file.seek(0)
-            with Image.open(image_file) as image:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', Image.DecompressionBombWarning)
+                image = Image.open(image_file)
+            with image:
                 if image.format != 'TIFF' or getattr(image, 'n_frames', 1) != 1 or image.mode == 'F':
                     raise ValueError('Se admite TIFF 2D entero; exporta los stacks o float a PNG')
                 if scale != 1:

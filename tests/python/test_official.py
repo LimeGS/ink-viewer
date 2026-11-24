@@ -143,6 +143,14 @@ class OfficialSource(unittest.TestCase):
                 im = Image.open(response); self.assertEqual((im.format, im.size), ('PNG', (20, 10)))
                 self.assertEqual(im.getpixel((0, 0)), 187)
 
+    def test_large_maps_are_not_refused_as_decompression_bombs(self):
+        import warnings
+        source = Fuente('official'); source.verificar()
+        with patch.object(Image, 'MAX_IMAGE_PIXELS', 100), warnings.catch_warnings(), servidor(p.Handler, source) as base:
+            warnings.simplefilter('error')  # a server where warnings are errors must still decode a 3200-pixel map
+            with urllib.request.urlopen(base + f'/api/mapa/catalog/{TIF}?escala=4') as response:
+                self.assertEqual(Image.open(response).size, (20, 10))
+
     def test_refresh_policy(self):
         source = Fuente('official')
         self.assertTrue(source.preparar())
