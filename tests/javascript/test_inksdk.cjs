@@ -93,4 +93,7 @@ test('no segment open, or a segment without surface volumes',async()=>{
  await empty.w.inksdkJobs.abrir();assert.match(empty.$('inksdkEstado').textContent,/no surface-volumes/);
  assert.equal(empty.$('inksdkRun').disabled,true);
  empty.$('inksdkBtn').click();assert.equal(empty.$('inksdkDlg').open,true);
+ const failing=await page({'/api/inksdk/volumenes':{status:400,body:null},'/api/inksdk':{body:{disponible:true,escritura:true}}},seg);
+ await failing.w.inksdkJobs.abrir();assert.match(failing.$('inksdkEstado').textContent,/Could not list surface volumes: HTTP 400/);
+ assert.equal(failing.$('inksdkRun').disabled,true,'a failed listing never leaves the dialog waiting');
 });
