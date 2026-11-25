@@ -12,6 +12,10 @@ Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cl
 
 ![The viewer browsing the official Vesuvius Challenge ink maps, read straight from the open-data bucket](docs/images/ui-overview.jpg)
 
+A two-minute tour: official maps, labeling a full-resolution crop, Super filters and running an ink-sdk model.
+
+https://github.com/user-attachments/assets/d47ffca1-7ff0-44b8-ae6c-ada94b753237
+
 ## Features
 
 - Search and filter scrolls, segments, model runs and depth offsets in one explorer.
