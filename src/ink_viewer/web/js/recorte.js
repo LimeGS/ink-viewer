@@ -13,9 +13,10 @@
  function paintButton(){const b=$id('recorteBtn');if(!b)return;
   b.hidden=!state.crop&&!state.reduced;b.classList.toggle('active',state.picking);b.setAttribute('aria-pressed',String(state.picking));
   b.textContent=state.crop?'Whole map':state.picking?'Click the map…':'Label a crop'}
- /* full-map pixel window around a click on the reduced view */
+ /* full-map pixel window around a click on the reduced view, snapped to a half-window grid: clicks near the same place
+    reopen the same crop (and its saved mask) instead of a window a few pixels off */
  function windowAt(p,full,reduced){const w=Math.min(SIZE,full.w),h=Math.min(SIZE,full.h),
-   at=(v,size,total)=>Math.max(0,Math.min(total-size,Math.round(v-size/2)));
+   at=(v,size,total)=>Math.max(0,Math.min(total-size,Math.round((v-size/2)/(SIZE/2))*(SIZE/2)));
   return {x:at(p[0]*full.w/reduced.w,w,full.w),y:at(p[1]*full.h/reduced.h,h,full.h),ancho:w,alto:h,ancho_mapa:full.w,alto_mapa:full.h}}
  async function pick(p){const r=state.reduced;state.picking=false;paintButton();if(!r)return;
   const response=await fetch('/api/dims/'+r.url.split('?')[0].replace(/^\/api\/mapa\//,''));
