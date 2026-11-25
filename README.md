@@ -21,7 +21,7 @@ Run on macOS, Linux or your own server with local, HTTP or S3 data. No GPU or cl
 - Browse with lazy thumbnails and previews; annotate on the full-resolution original raster.
 - Run a public ink model on the open segment through [ink-sdk](https://github.com/LimeGS/ink-sdk) (optional) and add its maps to the list.
 - Click a map point to see the CT cross-section through it, with the segment's mesh drawn on top (optional).
-- Browse every ink map the Vesuvius Challenge team publishes, indexed from the open-data bucket's own catalog and refreshed daily; gigapixel maps open as a reduced, browse-only view.
+- Browse every ink map the Vesuvius Challenge team publishes, indexed from the open-data bucket's own catalog and refreshed daily; gigapixel maps open as a reduced view and are labeled one full-resolution crop at a time.
 - Mirror saved annotations to a Hugging Face dataset (optional).
 
 The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not train models or render 3D meshes; inference runs only through the optional ink-sdk integration, and CT is read only for cross-sections. Missing scores and calibration remain unknown.
@@ -108,7 +108,7 @@ The first start takes a few seconds to build the index from the bucket's `metada
 ink-viewer --source official
 ```
 
-Indexes every ink map in the public open-data bucket from its `metadata.json` (no credentials, no manifest to prepare) and refreshes the index daily. Maps too large to label in a browser open as a reduced, browse-only view. See [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps).
+Indexes every ink map in the public open-data bucket from its `metadata.json` (no credentials, no manifest to prepare) and refreshes the index daily. Maps too large to label in a browser open as a reduced view; **Label a crop** opens an 8192 px full-resolution window to label. See [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps).
 
 <details>
 <summary><b>Public S3 or HTTP, without credentials</b></summary>
