@@ -28,7 +28,9 @@
   const anchor=$id('download');if(anchor)anchor.parentNode.insertBefore(button,anchor);else document.querySelector('.toolbar').appendChild(button);
   button.addEventListener('click',()=>{if(state.crop){state.crop=null;redraw();return}state.picking=!state.picking;paintButton()});
   const vp=$id('viewport');
-  if(vp){vp.addEventListener('pointerdown',e=>{state.down=[e.clientX,e.clientY]},true);
+  /* document capture runs before viewer.js's own capture listener on #viewport, which stops the event while labeling waits
+     for full resolution; while picking, the press is ours alone (no "view-only" note, no pan) and the click still follows */
+  if(vp){document.addEventListener('pointerdown',e=>{if(!vp.contains(e.target))return;state.down=[e.clientX,e.clientY];if(state.picking)e.stopPropagation()},true);
    vp.addEventListener('click',e=>{if(!state.picking||!state.down||Math.abs(e.clientX-state.down[0])+Math.abs(e.clientY-state.down[1])>4)return;
     if(typeof rp==='function')pick(rp(e))})}
   paintButton();return true}

@@ -43,6 +43,14 @@ test('the button appears on the reduced view and a click there opens a full-reso
  assert.equal(p.r.key(),'');assert.equal(p.r.query(FRAME),'');assert.equal(p.r.title(),'');
 });
 
+test('picking works while the labeling panel blocks the viewport',async()=>{
+ const p=await page(),vp=p.$('viewport');let reached=0;
+ vp.addEventListener('pointerdown',e=>{reached++;e.stopImmediatePropagation()},true);   // as viewer.js does while labeling waits
+ p.r.reduced({url:MAP,w:100,h:50});click(p.w,vp,5,5);assert.equal(reached,1,'not picking: the viewer still gets the press');
+ p.$('recorteBtn').click();click(p.w,vp,5,5);await settle();
+ assert.equal(reached,1,'picking: the press stays with the crop button');assert.equal(p.calls.show,1);
+});
+
 test('crops follow their segment and fall back when they cannot load',async()=>{
  const p=await page({point:[1,1]});
  assert.equal(p.r.failed(),false,'no crop: nothing to undo');
