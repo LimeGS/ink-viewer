@@ -88,6 +88,35 @@ class FuenteOficial(Fuente):
             return json.loads(path.read_text()) if path.is_file() else {}
         return super().indice(name, limite)
 
+    def listado(self, rel=''):
+        """One level of the public bucket through S3's anonymous ListObjectsV2 over HTTPS (plain HTTP sources cannot
+        list). ink-sdk jobs use it to find a segment's surface-volumes/."""
+        import urllib.parse, urllib.request
+        import xml.etree.ElementTree as ET
+        if rel:
+            ruta_dentro(Path('/'), rel)
+        prefix = rel.strip('/') + '/' if rel.strip('/') else ''
+        entries, token = set(), None
+        while True:
+            query = {'list-type': '2', 'delimiter': '/', 'prefix': prefix}
+            if token:
+                query['continuation-token'] = token
+            with urllib.request.urlopen(self.origen.rstrip('/') + '/?' + urllib.parse.urlencode(query), timeout=60) as response:
+                root = ET.fromstring(response.read())
+            tag = lambda element, name: element.find('{*}' + name)
+            for item in root.findall('{*}CommonPrefixes'):
+                entries.add((tag(item, 'Prefix').text[len(prefix):].rstrip('/'), True))
+            for item in root.findall('{*}Contents'):
+                key = tag(item, 'Key').text
+                if key != prefix:
+                    entries.add((key[len(prefix):], False))
+            more = tag(root, 'IsTruncated')
+            token = tag(root, 'NextContinuationToken')
+            if more is None or more.text != 'true' or token is None:
+                break
+            token = token.text
+        return sorted((name, directory) for name, directory in entries if name and not name.startswith('.'))
+
     @contextlib.contextmanager
     def abrir(self, rel, rango=None, head=False, zarr_meta=False):
         if rel in CACHED:

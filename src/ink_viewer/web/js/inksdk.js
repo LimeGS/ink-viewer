@@ -4,7 +4,7 @@
    Reads the viewer's shared `group`; adds no other global state than window.inksdkJobs. */
 (function(){
  const $id=id=>document.getElementById(id);
- const getJSON=url=>fetch(url).then(r=>r.json());
+ const getJSON=url=>fetch(url).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()});
  const state={vols:[],interval:3000,reload:()=>location.reload()};
  const meta=()=>typeof group!=='undefined'&&group&&group.catalogMeta;
  const say=text=>{$id('inksdkEstado').textContent=text};
@@ -46,7 +46,8 @@
   $id('inksdkDlg').showModal();
   if(!m||!m.lam||!m.scroll){say('Open a catalog segment first.');return}
   say('Looking for surface volumes…');
-  state.vols=await getJSON('/api/inksdk/volumenes?rollo='+encodeURIComponent(m.scroll)+'&segmento='+encodeURIComponent(m.lam));
+  try{state.vols=await getJSON('/api/inksdk/volumenes?rollo='+encodeURIComponent(m.scroll)+'&segmento='+encodeURIComponent(m.lam))}
+  catch(e){state.vols=[];say('Could not list surface volumes: '+(e&&e.message||e));return}
   if(!Array.isArray(state.vols)||!state.vols.length){state.vols=[];say('This segment has no surface-volumes/ in the source.');return}
   for(const v of state.vols)vols.add(new Option(v.name,v.name));
   vols.onchange=perfiles;perfiles();

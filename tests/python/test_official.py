@@ -236,3 +236,34 @@ class OfficialSource(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class OfficialListing(unittest.TestCase):
+    """ink-sdk jobs list a segment's surface-volumes/: the official source pages S3's anonymous ListObjectsV2."""
+
+    def test_lists_one_level_across_pages(self):
+        seen = []
+        pages = {None: ('<CommonPrefixes><Prefix>S/surface-volumes/2.4um-a.zarr/</Prefix></CommonPrefixes>'
+                        '<Contents><Key>S/surface-volumes/</Key></Contents><IsTruncated>true</IsTruncated>'
+                        '<NextContinuationToken>t2</NextContinuationToken>'),
+                 't2': ('<CommonPrefixes><Prefix>S/surface-volumes/8.64um-b.zarr/</Prefix></CommonPrefixes>'
+                        '<Contents><Key>S/surface-volumes/notes.txt</Key></Contents>'
+                        '<Contents><Key>S/surface-volumes/.hidden</Key></Contents><IsTruncated>false</IsTruncated>')}
+
+        class S3(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                from urllib.parse import parse_qs, urlsplit
+                query = parse_qs(urlsplit(self.path).query); seen.append(query)
+                body = ('<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                        + pages[query.get('continuation-token', [None])[0]] + '</ListBucketResult>').encode()
+                self.send_response(200); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+
+            def log_message(self, *a): pass
+
+        with servidor(S3) as url, patch.dict(os.environ, {'VISOR_OFFICIAL_BUCKET': url}):
+            source = Fuente('official')
+            self.assertEqual(source.listado('S/surface-volumes'),
+                             [('2.4um-a.zarr', True), ('8.64um-b.zarr', True), ('notes.txt', False)])
+            self.assertEqual([(q['prefix'], q['delimiter'], q['list-type']) for q in seen], [(['S/surface-volumes/'], ['/'], ['2'])] * 2)
+            with self.assertRaises(ValueError):
+                source.listado('../etc')
