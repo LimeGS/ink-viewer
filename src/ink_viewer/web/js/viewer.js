@@ -13,7 +13,7 @@ function mapUrl(frame,contrast,scale){
  if(!OFFICIAL_FRAME.test(frame))return frame+'/'+contrast+(scale===4?'_lo.jpg':scale===8?'_lo8.jpg':'.png');
  const ext=/\.(png|tiff?)$/i.exec(frame);
  const url=ext?frame.slice(0,-ext[0].length)+(contrast==='global'?'-global':'')+ext[0]:frame+(contrast==='global'?'-global':'')+'.png';
- if(ext&&/^tiff?$/i.test(ext[1]))return '/api/mapa/'+url.replace(/^\.\.\//,'').split('/').map(encodeURIComponent).join('/')+'?escala='+(scale||1);
+ if(ext&&/^tiff?$/i.test(ext[1]))return '/api/mapa/'+url.replace(/^\.\.\//,'').split('/').map(encodeURIComponent).join('/')+'?escala='+(scale||1)+(!scale&&globalThis.recorteVista?globalThis.recorteVista.query(frame):'');
  return scale?previewOf(url,scale):url;
 }
 /* The catalog publisher supplies this explicit association; names and paths alone never establish it. */
@@ -132,18 +132,18 @@ function fit(){if(!im.naturalWidth)return;const[W,H]=cajaUtil(),[iw,ih]=oriDims(
  x=(W-iw*zoom)/2;y=(H-ih*zoom)/2;fitted=true;paint()}
 function scaleTo(z,cx=vp.clientWidth/2,cy=vp.clientHeight/2){z=Math.max(.005,Math.min(20,z));let ratio=z/zoom;x=cx-(cx-x)*ratio;y=cy-(cy-y)*ratio;zoom=z;fitted=false;paint()}
 function ensureContrast(){for(const o of $('contrast').options){o.dataset.originalLabel ||= o.textContent;o.textContent=group?.catalogMeta?.originalContrast&&o.value==='fixed'?'Original image':o.dataset.originalLabel}if(!group?.frameContrasts)return;const dir=projection?group.maximum:group.frames[Number(slider.value)],modes=group.frameContrasts[dir]||group.availableContrasts||[];for(const o of $('contrast').options)o.disabled=!modes.includes(o.value);if(modes.length&&!modes.includes($('contrast').value))$('contrast').value=modes[0]}
-function show(reset=false){if(!group)return;if(pintar)release();if(!group.catalogMeta)for(const o of $('contrast').options)o.disabled=false;ensureContrast();let n=Number(slider.value),dir=projection?group.maximum:group.frames[n];$('offset').value=projection?'Max.':group.catalogMeta?.depthKnown===false?'Map':signed(n);pintarBanda(n);syncHash();if(projection){const o=group.maximumOffsets||[];$('projection').textContent='Maximum '+(o.length?signed(Math.min(...o))+'…'+signed(Math.max(...o)):'across depths')+' · can merge strokes from different sheets or artefacts.'}$('prev').disabled=projection||n<=Number(slider.min);$('next').disabled=projection||n>=Number(slider.max);slider.disabled=projection||group.catalogMeta?.depthKnown===false;$('projection').hidden=!projection;$('max').classList.toggle('active',projection);$('max').setAttribute('aria-pressed',String(projection));let token=++request;fullresReady=0;$('notice').hidden=false;im.style.opacity='.3';
+function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThis.recorteVista.showing();if(pintar)release();if(!group.catalogMeta)for(const o of $('contrast').options)o.disabled=false;ensureContrast();let n=Number(slider.value),dir=projection?group.maximum:group.frames[n];$('offset').value=projection?'Max.':group.catalogMeta?.depthKnown===false?'Map':signed(n);pintarBanda(n);syncHash();if(projection){const o=group.maximumOffsets||[];$('projection').textContent='Maximum '+(o.length?signed(Math.min(...o))+'…'+signed(Math.max(...o)):'across depths')+' · can merge strokes from different sheets or artefacts.'}$('prev').disabled=projection||n<=Number(slider.min);$('next').disabled=projection||n>=Number(slider.max);slider.disabled=projection||group.catalogMeta?.depthKnown===false;$('projection').hidden=!projection;$('max').classList.toggle('active',projection);$('max').setAttribute('aria-pressed',String(projection));let token=++request;fullresReady=0;$('notice').hidden=false;im.style.opacity='.3';
  if(!dir){$('notice').textContent='This centre is not available yet';im.hidden=true;$('download').removeAttribute('href');return}
  const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();
- loader.onload=()=>{if(token!==request)return;let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px';if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
+ loader.onload=()=>{if(token!==request)return;if(globalThis.recorteVista)globalThis.recorteVista.reduced(null);let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px'+(globalThis.recorteVista?globalThis.recorteVista.title():'');if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
  /* 24-nov: a TIFF map too large for full resolution in a browser (official whole segments reach gigapixels) opens as a
     reduced, browse-only view: the 1/4 map, or the published 1/8 JPEG. fullresReady stays 0, so labeling stays locked. */
  const reduced=()=>{if(token!==request)return;const W=loader.naturalWidth,H=loader.naturalHeight,changed=im.naturalWidth!==W||im.naturalHeight!==H;
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
   im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=loader.src;
-  $('notice').hidden=false;$('notice').textContent='Reduced view: this map is too large for full resolution in a browser. Browse only; labeling is off.';
-  im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
- loader.onerror=()=>{if(token!==request)return;
+  $('notice').hidden=false;$('notice').textContent='Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
+  if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
+ loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);
   if(/\.tiff?$/i.test(dir||'')&&!loader.reduced){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;loader.src=mapUrl(dir,$('contrast').value,4);return}
   cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
 }
@@ -354,14 +354,14 @@ function trasFrame(w,h){cargandoOff();
  curW=w||curW||im.naturalWidth;curH=h||curH||im.naturalHeight;
  if(!curW)return;
  /* one mask per DEPTH (12-sep): the sheet key carries the centre, so changing depth swaps the working mask (IndexedDB) */
- const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+'|c'+(projection?'max':slider.value);   /* 25-sep: clave de la grilla (ver claveLienzo) */
+ const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);   /* 25-sep: clave de la grilla (ver claveLienzo) */
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}
  const svg=$('regionOverlay');svg.setAttribute('viewBox','0 0 '+curW+' '+curH);svg.setAttribute('width',curW);svg.setAttribute('height',curH);
  dibujarRegion();
 }
 /* 25-sep: si el censo de orientación llega después de montar la máscara, la clave pasa de la vieja (por corrida) a la de la grilla */
 function reclavar(){if(!group||!curW||vp.classList.contains('cargando'))return;
- const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+'|c'+(projection?'max':slider.value);
+ const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}}
 
 /* la mascara vive por hoja fisica Y centro (una por profundidad); mismo raster para BASE/r1 y fwd/rev */
@@ -1403,7 +1403,7 @@ addEventListener('DOMContentLoaded',()=>{
   const ruta=segRuta(group),rollo=group.scroll||group.catalogMeta?.scroll||ROLLO;
   return {corrida,revision:window.revisionMascara?window.revisionMascara(corrida):0,vacia:!d.some((v,i)=>i%4===3&&v>=128),
    nombres:TIPOS.map(t=>nombreDe(t,group)),capas:TIPOS.map(t=>capa(t,d,W,Hh)),
-   url:'/api/mascara-par/'+encodeURIComponent(carpetaDe(group))+'?c='+encodeURIComponent(corrida.profundidad)+(ruta?'&base='+encodeURIComponent(ruta.base):'')+'&rollo='+encodeURIComponent(rollo)};
+   url:'/api/mascara-par/'+encodeURIComponent(carpetaDe(group))+'?c='+encodeURIComponent(corrida.profundidad)+(ruta?'&base='+encodeURIComponent(ruta.base):'')+'&rollo='+encodeURIComponent(rollo)+(corrida.recorte?'&recorte='+[corrida.recorte.x,corrida.recorte.y,corrida.recorte.ancho,corrida.recorte.alto].join(','):'')};
  };
  const codificar=par=>Promise.all(par.capas.map(c=>new Promise((ok,mal)=>c.toBlob(b=>{
   if(!b)return mal(new Error('PNG encoding failed'));

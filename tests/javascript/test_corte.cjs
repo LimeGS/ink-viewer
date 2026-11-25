@@ -57,3 +57,10 @@ test('toolbar without Open PNG or viewport, and no rp()',async()=>{
  const q=await page({noRp:true});q.$('corteBtn').click();
  click(q.w,q.$('viewport'),5,5);await settle();assert.equal(q.calls.length,0);
 });
+
+test('on a crop, the point and the map size refer to the whole map',async()=>{
+ const p=await page();
+ p.w.recorteVista={info:()=>({x:100,y:200,ancho:4096,alto:4096,ancho_mapa:9000,alto_mapa:8000})};
+ await p.w.corteVista.mostrar([1.2,2.4]);
+ assert.match(p.calls[0],/[?&]u=101&v=202&w=9000&h=8000&/);
+});

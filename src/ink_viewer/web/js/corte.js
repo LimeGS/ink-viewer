@@ -43,9 +43,9 @@
   const m=g&&g.catalogMeta,volume=volumeOf(g);
   if(!m||!m.lam||!m.scroll){say('Open a catalog segment first.');return}
   if(!volume){say('This map does not name its CT volume, so the mesh and CT cannot be matched.');return}
-  const [u,v]=p.map(Math.round);
+  const crop=globalThis.recorteVista&&globalThis.recorteVista.info(),[u,v]=p.map((n,i)=>Math.round(n)+(crop?[crop.x,crop.y][i]:0));   // a crop maps back to the whole map
   const q=new URLSearchParams({rollo:m.scroll,segmento:m.lam,volumen:volume,u,v});
-  if(typeof curW!=='undefined'&&curW){q.set('w',curW);q.set('h',curH)}
+  if(typeof curW!=='undefined'&&curW){q.set('w',crop?crop.ancho_mapa:curW);q.set('h',crop?crop.alto_mapa:curH)}
   for(const [k,val] of Object.entries(scanOf(g)))q.set(k,val);   // lets sources without listings (HTTP) be read
   say('Reading the CT around ('+u+', '+v+')…');
   const response=await fetch('/api/corte?'+q);

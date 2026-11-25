@@ -301,6 +301,7 @@ function infoDeGrupo(g,c,w,h,clave){
   orientacion:{correccion:cor,clase:a?String(a[3]||''):(cor?'SIN_CORRECCION':'DESCONOCIDA'),
    regla:"Orientation metadata: [transpose, flip rows, flip columns]. Zero means reading orientation or no inventory entry; null means the inventory could not be read."},
   vista_al_guardar:{corregida:!!(ORI_AUTO&&a),voltear_filas:!!(VOLT&&VOLT.f),voltear_columnas:!!(VOLT&&VOLT.c),nota:"Display only; the mask grid is unchanged"},
+  ...(globalThis.recorteVista&&globalThis.recorteVista.info()?{recorte:globalThis.recorteVista.info()}:{}),
   clave_local:clave||null,archivos:[seg+'_inklabels.png',seg+'_supervision_mask.png']}}
 /* datos de la corrida DUEÑA de la máscara, tomados en el momento de llamar (index.html los pide al empezar un guardado) */
 window.mascaraCorridaInfo=function(cen,w,h){if(!H)return null;const g=grupoMascara();if(!g)return null;
@@ -448,7 +449,7 @@ window.vetoGuardado=function(info){
  const du=dueno();
  if(!du||!du.group||du.group.id!==info.run_id)return "Not uploaded: mask has no known run binding; wait for loading to finish";
  const k0=String(info.clave_local||'').replace(/\|c[^|]*$/,''),h0=typeof hojaDe==='function'?hojaDe(du.group.id):null,
-       esperado=typeof window.claveLienzo==='function'?window.claveLienzo(du.group,du.w,du.h):(h0&&h0.nombre||(typeof baseId==='function'?baseId(du.group.id):du.group.id));
+       esperado=(typeof window.claveLienzo==='function'?window.claveLienzo(du.group,du.w,du.h):(h0&&h0.nombre||(typeof baseId==='function'?baseId(du.group.id):du.group.id)))+(globalThis.recorteVista?globalThis.recorteVista.key():'');   /* a crop's canvas key carries its window */
  if(k0!==esperado)return "Not uploaded: canvas ("+k0+") does not belong to run "+du.group.id+" (another segment or grid)";
  if(+info.ancho!==+du.w||+info.alto!==+du.h)return "Not uploaded: mask dimensions "+info.ancho+'×'+info.alto+"; run dimensions "+du.w+'×'+du.h;
  const kp=clavePorInfo(info);
@@ -564,7 +565,7 @@ if(typeof trasFrame==='function'){const tf0=trasFrame;
  trasFrame=function(){const r=tf0.apply(this,arguments);
   try{const d=window.mascaraDueno;
    if(d&&H&&d.nombre===H.nombre&&group&&d.group!==group&&window.lienzoPorGrilla&&typeof window.claveLienzo==='function'&&
-      H.nombre===window.claveLienzo(group,curW,curH)+'|c'+(projection?'max':String(slider.value))){
+      H.nombre===window.claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':String(slider.value))){
     d.group=group;PREV=null;pintarPrev();pintarCorrida();leerGuardada();
     estado("Mask at "+cStr(d.centro)+" shared with "+(meta(group).modelo||group.id)+" (matching grid and dimensions)")}
    pintarLimite()}

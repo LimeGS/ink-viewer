@@ -108,6 +108,7 @@ async function confirmarMetadatosMascara(blobs,info,label) {
 async function obtenerParMascara(lam,c,base,propuesta = false,rollo = window.ROLLO,soloMetadata = false) {
   const q = new URLSearchParams({c:String(c),rollo:String(rollo || '')});
   if (base) q.set('base',base); if (propuesta) q.set('propuesta','1');
+  const crop = globalThis.recorteVista && globalThis.recorteVista.info(); if (crop) q.set('recorte',[crop.x,crop.y,crop.ancho,crop.alto].join(','));
   if (soloMetadata) { q.set('metadata','1'); q.set('opcional','1'); }
   let r = await fetch('/api/mascara-par/' + encodeURIComponent(lam) + '?' + q,{cache:'no-store'});
   if (r.status === 409 && !soloMetadata) {
