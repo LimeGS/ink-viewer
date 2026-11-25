@@ -28,7 +28,9 @@ The frontend uses JavaScript, HTML and CSS; Python serves data and validates sav
 
 ![Cross-sections: the mesh on its sheet (left) and cutting across the layers (right)](docs/images/cross-sections.jpg)
 
-![Labeling ink (green) and reviewed non-ink (red) on a full-resolution official map](docs/images/annotate.jpg)
+![Labeling ink and no-ink on a full-resolution crop of a 2.4 Gpx PHercParis4 map](docs/images/annotate.jpg)
+
+![Running an ink-sdk model on the open segment from the viewer: the list of public models](docs/images/inksdk.jpg)
 
 <details>
 <summary><b>How it helps when hunting for letters</b></summary>
