@@ -32,6 +32,12 @@ The frontend uses JavaScript, HTML and CSS; Python serves data and validates sav
 
 ![Running an ink-sdk model on the open segment from the viewer: the list of public models](docs/images/inksdk.jpg)
 
+To run models from the viewer, install [ink-sdk](https://github.com/LimeGS/ink-sdk) in its own environment and point the viewer at it, with a writable folder for the new maps:
+
+```bash
+INK_SDK_PYTHON=/path/to/ink-sdk/.venv/bin/python ink-viewer --source official --annotations /path/to/annotations
+```
+
 <details>
 <summary><b>How it helps when hunting for letters</b></summary>
 
@@ -110,7 +116,7 @@ The first start takes a few seconds to build the index from the bucket's `metada
 ink-viewer --source official
 ```
 
-Indexes every ink map in the public open-data bucket from its `metadata.json` (no credentials, no manifest to prepare) and refreshes the index daily. Maps too large to label in a browser open as a reduced view; **Label a crop** opens an 8192 px full-resolution window to label. See [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps).
+Indexes every ink map in the public open-data bucket from its `metadata.json` (no credentials, no manifest to prepare) and refreshes the index daily. Maps too large to label in a browser open as a reduced view; **Label a crop** opens an 8192 px full-resolution window to label. See [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps). Cropping these TIFF maps needs the `crop` extra: `python -m pip install ".[crop]"`.
 
 <details>
 <summary><b>Public S3 or HTTP, without credentials</b></summary>
