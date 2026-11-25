@@ -1,11 +1,11 @@
 /* Labeling by crop (server: /api/mapa/...?recorte=x,y,w,h). A map too large to label whole opens as a reduced,
-   browse-only view; "Label a crop" turns the next click on it into a full-resolution window of SIZE px a side that
+   browse-only view; "Label a crop" turns the next click on it into a full-resolution window of SIZE px a side (8192: about 67 Mpx, the mask limit, labels smoothly) that
    labels like any map. Its mask pair is saved apart (labels/.../recorte-x<x>-y<y>-<w>x<h>) with the window in its
    provenance, and its browser canvas has its own key, so crops never overwrite each other or the whole map.
    "Whole map" goes back to the reduced view. viewer.js, corte.js, etiquetar.js and etiq_herramientas.js read the
    window through window.recorteVista. */
 (function(){
- const SIZE=4096,$id=id=>document.getElementById(id);
+ const SIZE=8192,$id=id=>document.getElementById(id);
  const state={crop:null,reduced:null,picking:false,down:null};
  const lam=()=>typeof group!=='undefined'&&group&&(group.catalogMeta&&group.catalogMeta.lam||group.id)||null;
  const say=t=>{if(typeof msg==='function')msg(t)};

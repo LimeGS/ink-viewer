@@ -1461,7 +1461,7 @@ addEventListener('DOMContentLoaded',()=>{
   b3.disabled=true; b3.textContent='Saving pair…';   /* 25-sep herramientas */
   subirPar()
    .then(rs=>{ if(typeof msg==='function')msg("Saved annotations: "+(rs[0].clave_profundidad||rs[0].clave).replace(/\/[^/]*$/,'/')+(rs[0].clave_profundidad?'':" (no depth: maximum projection)")); })
-   .catch(e=>{ if(typeof msg==='function')msg((/^sin cambios/.test(String(e))?'':"Save failed: ")+String(e).slice(0,140)); })   /* 25-sep herramientas: «sin cambios» no es un fallo */
+   .catch(e=>{ const t=String(e&&e.message||e); if(typeof msg==='function')msg((/^(sin cambios|No changes)/.test(t)?'':"Save failed: ")+t.slice(0,140)); })   /* nothing new since the last save (the 20 s autosave, usually) is not a failure */
    .finally(()=>{ b3.disabled=!visorPuedeGuardar; b3.textContent=visorTexto("save pair"); });
  };
  $('exp').parentElement && $('exp').parentElement.append(b3);

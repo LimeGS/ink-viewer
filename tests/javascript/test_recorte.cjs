@@ -32,12 +32,12 @@ test('the button appears on the reduced view and a click there opens a full-reso
  click(p.w,p.$('viewport'),50,50,[10,10]);await settle();assert.equal(p.calls.fetch.length,0,'a drag is ignored');
  click(p.w,p.$('viewport'),5,5);await settle();
  assert.deepEqual(p.calls.fetch,['/api/dims/catalog/PHercX/segments/seg-1/ink-detection/m.tif']);
- // (60, 40) on the 100 x 50 view is (6000, 4000) on the 10000 x 5000 map; a 4096 window, kept inside the map
- assert.deepEqual(plain(p.r.info()),{x:3952,y:904,ancho:4096,alto:4096,ancho_mapa:10000,alto_mapa:5000});
+ // (60, 40) on the 100 x 50 view is (6000, 4000) on the 10000 x 5000 map; an 8192 window, kept inside the map
+ assert.deepEqual(plain(p.r.info()),{x:1808,y:0,ancho:8192,alto:5000,ancho_mapa:10000,alto_mapa:5000});
  assert.equal(p.calls.show,1);assert.match(p.calls.msg.at(-1),/Loading a full-resolution crop/);
- assert.equal(p.r.query(FRAME),'&recorte=3952,904,4096,4096');
+ assert.equal(p.r.query(FRAME),'&recorte=1808,0,8192,5000');
  assert.equal(p.r.query(FRAME.replace('seg-1','seg-2')),'','other segments are never cropped');
- assert.equal(p.r.key(),'|r3952,904');assert.equal(p.r.title(),' · crop at 3952, 904 of 10000 × 5000');
+ assert.equal(p.r.key(),'|r1808,0');assert.equal(p.r.title(),' · crop at 1808, 0 of 10000 × 5000');
  p.r.reduced(null);assert.equal(b.hidden,false);assert.equal(b.textContent,'Whole map');
  b.click();assert.equal(p.r.info(),null);assert.equal(p.calls.show,2,'back to the reduced view');
  assert.equal(p.r.key(),'');assert.equal(p.r.query(FRAME),'');assert.equal(p.r.title(),'');
@@ -47,7 +47,7 @@ test('crops follow their segment and fall back when they cannot load',async()=>{
  const p=await page({point:[1,1]});
  assert.equal(p.r.failed(),false,'no crop: nothing to undo');
  p.r.reduced({url:MAP,w:100,h:50});p.$('recorteBtn').click();click(p.w,p.$('viewport'),5,5);await settle();
- assert.deepEqual(plain(p.r.info()),{x:0,y:0,ancho:4096,alto:4096,ancho_mapa:10000,alto_mapa:5000},'clamped to the corner');
+ assert.deepEqual(plain(p.r.info()),{x:0,y:0,ancho:8192,alto:5000,ancho_mapa:10000,alto_mapa:5000},'clamped to the corner');
  p.r.showing();assert.notEqual(p.r.info(),null,'same segment keeps the crop');
  assert.equal(p.r.failed(),true);assert.equal(p.r.info(),null);assert.match(p.calls.msg.at(-1),/could not be loaded/);
  p.r.reduced({url:MAP,w:100,h:50});p.$('recorteBtn').click();click(p.w,p.$('viewport'),5,5);await settle();
