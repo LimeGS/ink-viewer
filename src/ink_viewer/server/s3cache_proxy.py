@@ -21,7 +21,7 @@ import ink_viewer.server.canonical_masks as canonical
 import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.inksdk_job as inksdk
 import ink_viewer.server.corte as corte
-from ink_viewer.server.tiff_header import tiff_dims
+from ink_viewer.server.tiff_header import tiff_dims, tiff_region
 from ink_viewer.server.hf_sync import HFSync
 
 # Largest TIFF map decoded on the server, and largest sent at full resolution (a browser cannot hold gigapixel images;
@@ -44,7 +44,7 @@ STATIC = {str(path.relative_to(CODE)) for path in CODE.rglob('*')
           if path.is_file() and path.suffix in {'.js', '.css', '.html', '.woff2', '.webp'}}
 VIEWER_TOOLS = ('filtros_pro.js', 'super_mosaico.js', 'precarga.js', 'fallo_visible.js',
                 'explorer_pro.js', 'ui_modos.js', 'hist_v5.js', 'spinner.js', 'etiq_extra.js',
-                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js', 'corte.js')
+                'hd.js', 'etiq_herramientas.js', 'guias_medicion.js', 'responsive.js', 'inksdk.js', 'corte.js', 'recorte.js')
 CACHE = ROOT / '.s3cache'
 LOG_FILE = ROOT / 's3cache_proxy.log'
 # buckets privados (GENERALIZAR.md regla 3): URIs completas sin barra final
@@ -166,7 +166,49 @@ def leer_mascara(body):
         raise ValueError('PNG invalido o incompleto') from e
 
 
-def validar_corrida(info, size, lamina, base, depth, rollo=None):
+_TIFF_LOCAL = {'key': None, 'path': None}
+_TIFF_LOCAL_LOCK = threading.Lock()
+
+
+def _tiff_local(fuente, rel, limit=256 * 2**20):
+    """Local copy of the last TIFF map cropped: successive crops of a 254 MB official map download it once."""
+    key = (fuente.id, rel)
+    with _TIFF_LOCAL_LOCK:
+        if _TIFF_LOCAL['key'] == key and _TIFF_LOCAL['path'] and os.path.exists(_TIFF_LOCAL['path']):
+            return _TIFF_LOCAL['path']
+        fd, part = tempfile.mkstemp(prefix='ink-viewer-crop-', suffix='.tif')
+        try:
+            with os.fdopen(fd, 'wb') as out, fuente.abrir(rel) as (_, _, body):
+                total = 0
+                for block in iter(lambda: body.read(2**20), b''):
+                    total += len(block)
+                    if total > limit:
+                        raise ValueError('TIFF map over 256 MiB')
+                    out.write(block)
+        except BaseException:
+            os.unlink(part)
+            raise
+        if _TIFF_LOCAL['path'] and os.path.exists(_TIFF_LOCAL['path']):
+            os.unlink(_TIFF_LOCAL['path'])
+        _TIFF_LOCAL.update(key=key, path=part)
+        return part
+
+
+def leer_recorte(params):
+    """?recorte=x,y,w,h: a full-resolution window of a map too large to label whole (labeling by crop)."""
+    raw = params.get('recorte', [None])[0]
+    if raw is None:
+        return None
+    m = re.fullmatch(r'(\d{1,7}),(\d{1,7}),(\d{1,6}),(\d{1,6})', raw)
+    if not m:
+        raise ValueError('Crop must be x,y,width,height')
+    x, y, w, h = map(int, m.groups())
+    if not w or not h or w * h > MASK_PIXELS:
+        raise ValueError(f'Crop must be 1 to {MASK_PIXELS} pixels')
+    return {'x': x, 'y': y, 'ancho': w, 'alto': h}
+
+
+def validar_corrida(info, size, lamina, base, depth, rollo=None, recorte=None):
     if info is None:
         return
     if not isinstance(info, dict):
@@ -184,9 +226,13 @@ def validar_corrida(info, size, lamina, base, depth, rollo=None):
         raise ValueError('La corrida pertenece a otro rollo')
     if info.get('profundidad') != depth or depth != 'max' and type(info.get('profundidad')) is not int:
         raise ValueError('La corrida pertenece a otra profundidad')
+    # A crop mask never stands in for the whole map, nor for another crop: its window is part of its identity.
+    window = info.get('recorte')
+    if (recorte is None) != (window is None) or recorte and (not isinstance(window, dict) or {k: window.get(k) for k in recorte} != recorte):
+        raise ValueError('The run belongs to another crop of this map')
 
 
-def validar_par(inkbody, supbody, info, lamina, base, depth, rollo=None):
+def validar_par(inkbody, supbody, info, lamina, base, depth, rollo=None, recorte=None):
     from PIL import ImageChops
     ink, imeta = leer_mascara(inkbody)
     sup, smeta = leer_mascara(supbody)
@@ -197,7 +243,7 @@ def validar_par(inkbody, supbody, info, lamina, base, depth, rollo=None):
     if imeta != smeta or info is not None and imeta != info:
         raise ValueError('El par PNG y su corrida no tienen los mismos metadatos')
     corrida = info if info is not None else imeta
-    validar_corrida(corrida, ink.size, lamina, base, depth, rollo)
+    validar_corrida(corrida, ink.size, lamina, base, depth, rollo, recorte)
     return corrida
 
 
@@ -210,13 +256,15 @@ def profundidad(params):
     return int(value)
 
 
-def ubicacion_par(lamina, base, depth, propuesta=False):
+def ubicacion_par(lamina, base, depth, propuesta=False, recorte=None):
     if not re.fullmatch(r'[A-Za-z0-9][\w.-]*', lamina) or '..' in lamina:
         raise ValueError('Lamina invalida')
     prefix = f'catalog/{base}/labels/'
+    # Each crop keeps its own pair beside the whole-map one, never on top of it.
+    window = '/recorte-x{x}-y{y}-{ancho}x{alto}'.format(**recorte) if recorte else ''
     if depth == 'max':
-        return prefix + 'etiquetas/' + lamina
-    return prefix + 'por-profundidad/' + ('_propuestas/' if propuesta else '') + f'{lamina}/c{depth:+03d}'
+        return prefix + 'etiquetas/' + lamina + window
+    return prefix + 'por-profundidad/' + ('_propuestas/' if propuesta else '') + f'{lamina}/c{depth:+03d}' + window
 
 
 def configurar(scroll=None, raiz=None, fuente=None):
@@ -560,10 +608,14 @@ class Handler(SimpleHTTPRequestHandler):
                 if getattr(e, 'code', 404) != 404 or index == len(candidates) - 1:
                     raise
 
-    def _mapa_tiff(self, rel, scale, head=False):
+    def _mapa_tiff(self, rel, scale, head=False, recorte=None):
         if scale not in (1, 4, 8) or not re.fullmatch(r'catalog/[^/]+/segments/[^/]+/ink-detection/[^/]+\.tiff?', rel, re.I):
             raise ValueError('Ruta TIFF o escala invalida')
         source_rel = self.fuente.ruta_catalogo(rel)
+        if recorte:
+            if scale != 1:
+                raise ValueError('A crop is always full resolution')
+            return self._recorte_tiff(source_rel, recorte, head)
         preview = getattr(self.fuente, 'preview', None)
 
         def published(jpg):
@@ -613,6 +665,37 @@ class Handler(SimpleHTTPRequestHandler):
                     length = output.tell(); output.seek(0)
                     return self._fuente_stream(200, {'Content-Length': str(length), 'Content-Type': 'image/png'}, output, head)
 
+    def _recorte_tiff(self, source_rel, recorte, head=False):
+        """Full-resolution PNG of one window of a TIFF map, for labeling maps too large to label whole."""
+        from PIL import Image
+        x, y, w, h = (recorte[k] for k in ('x', 'y', 'ancho', 'alto'))
+        path = _tiff_local(self.fuente, source_rel)
+        try:
+            with open(path, 'rb') as fh:
+                array = tiff_region(fh, x, y, w, h)
+            image = Image.fromarray(array)
+        except ValueError as error:
+            if 'imagecodecs' in str(error):
+                raise ValueError('This map\'s compression needs imagecodecs: pip install "ink-viewer[crop]"') from error
+            raise
+        except ImportError:
+            # Without tifffile, Pillow decodes the whole map: fine below the decode limit, refused above it.
+            width, height = tiff_dims(self.fuente, source_rel)
+            if width * height > MAP_PIXELS:
+                raise ValueError('Labeling by crop on maps this large needs tifffile: pip install "ink-viewer[crop]"')
+            if x + w > width or y + h > height:
+                raise ValueError(f'Crop {x},{y} {w}x{h} outside the {width}x{height} map')
+            import warnings
+            Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, MAP_PIXELS)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', Image.DecompressionBombWarning)
+                with Image.open(path) as whole:
+                    image = whole.crop((x, y, x + w, y + h))
+        with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as output:
+            image.save(output, format='PNG')
+            length = output.tell(); output.seek(0)
+            return self._fuente_stream(200, {'Content-Length': str(length), 'Content-Type': 'image/png'}, output, head)
+
     def _fuente_stream(self, status, headers, body, head=False, fuente=None):
         etag = headers.get('ETag')
         if status == 200 and etag and any(value.strip().removeprefix('W/') in (etag, '*')
@@ -658,7 +741,7 @@ class Handler(SimpleHTTPRequestHandler):
             if self.fuente.manifest_rel and path in ('catalog/_viewer/manifest-work3.js', 'all-gallery/derived-c019/manifest-c019-local.js'):
                 return self._send_bytes(b'// Generated index is authoritative.\n', 'application/javascript', self.fuente.tipo, head)
             if path.startswith('api/mapa/'):
-                return self._mapa_tiff(path[len('api/mapa/'):], int(params.get('escala', ['1'])[0]), head)
+                return self._mapa_tiff(path[len('api/mapa/'):], int(params.get('escala', ['1'])[0]), head, leer_recorte(params))
             if path == 'api/inksdk':
                 ok, why = inksdk.disponible()
                 return self._json({'disponible': ok, 'motivo': why, 'escritura': bool(self.fuente.anotaciones),
@@ -875,16 +958,18 @@ class Handler(SimpleHTTPRequestHandler):
             raise ValueError('Rollo invalido')
         base = labels_base(lamina, params.get('base', [None])[0], rollo, self.fuente)
         depth = profundidad(params)
-        folder = ubicacion_par(lamina, base, depth, params.get('propuesta') == ['1'])
+        recorte = leer_recorte(params)
+        folder = ubicacion_par(lamina, base, depth, params.get('propuesta') == ['1'], recorte)
         ruta_dentro(Path('/'), folder)
-        return params, base, depth, rollo, folder
+        return params, base, depth, rollo, folder, recorte
 
     def _leer_par(self, lamina):
         if self.fuente and self.headers.get('X-Visor-Origen') not in (None, self.fuente.id):
             return self._json({'error': 'El origen cambio; recarga antes de importar mascaras'}, 409)
         try:
-            params, base, depth, rollo, folder = self._datos_par(lamina)
-            candidates = canonical.select(self.fuente, rollo or base.split('/')[0], base.split('/')[-1], depth, params.get('propuesta') == ['1'])
+            params, base, depth, rollo, folder, recorte = self._datos_par(lamina)
+            # Canonical pairs cover whole maps; a crop only ever reads its own saved pair.
+            candidates = None if recorte else canonical.select(self.fuente, rollo or base.split('/')[0], base.split('/')[-1], depth, params.get('propuesta') == ['1'])
             if candidates is not None:
                 identity = params.get('version',[None])[0]
                 if identity: candidates = [r for r in candidates if r['id'] == identity]
@@ -926,7 +1011,7 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({'error': 'No hay par de mascaras guardado'}, 404)
                 if any(body is None for body in bodies):
                     return self._json({'error': 'Par incompleto: falta inklabels o supervision_mask'}, 409)
-                info = validar_par(*bodies, None, lamina, base, depth, rollo)
+                info = validar_par(*bodies, None, lamina, base, depth, rollo, recorte)
             if params.get('metadata') == ['1']:
                 return self._json({'corrida': info})
             return self._json(dict(zip(('inklabels', 'supervision_mask'), [base64.b64encode(body).decode('ascii') for body in bodies]), corrida=info))
@@ -950,7 +1035,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if not isinstance(data.get(key), str) or len(data[key]) > ((MASK_LIMIT + 2) // 3) * 4:
                     raise ValueError('Falta PNG base64 o supera 64 MiB')
                 bodies.append(base64.b64decode(data[key], validate=True))
-            _, base, depth, rollo, folder = self._datos_par(lamina)
+            _, base, depth, rollo, folder, recorte = self._datos_par(lamina)
             info = data.get('corrida')
             if not isinstance(info, dict) or not isinstance(info.get('par_id'), str) or not info['par_id'] or not isinstance(info.get('run_id'), str) or not info['run_id']:
                 raise ValueError('El par requiere corrida con run_id y par_id')
@@ -960,10 +1045,10 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError('El par requiere cara y orientacion explicitamente registradas')
             if 'base' not in info:
                 raise ValueError('El par requiere base de origen registrada')
-            info = validar_par(*bodies, info, lamina, base, depth, rollo)
+            info = validar_par(*bodies, info, lamina, base, depth, rollo, recorte)
             if not leer_mascara(bodies[1])[0].getbbox():
                 raise ValueError('No se guarda un par sin pixeles supervisados')
-            directories = [ubicacion_par(lamina, base, 'max'), folder]
+            directories = [ubicacion_par(lamina, base, 'max', recorte=recorte), folder]
             files = dict(zip((lamina + '_inklabels.png', lamina + '_supervision_mask.png'), bodies))
             if info is not None:
                 files[lamina + '_mascara_corrida.json'] = json.dumps(info, ensure_ascii=True).encode()
@@ -1023,7 +1108,9 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError('Cuerpo vacio o mayor a 64 MiB')
             body = self.rfile.read(n)
             lamina, name = rel.split('/')
-            _, base, depth, rollo, folder = self._datos_par(lamina)
+            _, base, depth, rollo, folder, recorte = self._datos_par(lamina)
+            if recorte:
+                raise ValueError('Crop masks are saved as pairs: use /api/mascara-par')
             if rel.endswith('.png'):
                 image, info = leer_mascara(body)
                 validar_corrida(info, image.size, lamina, base, depth, rollo)

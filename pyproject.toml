@@ -26,10 +26,11 @@ where = ["src"]
 ink_viewer = ["web/*.html", "web/pages/*.html", "web/js/*.js", "web/css/*.css", "web/fonts/*.woff2", "web/images/*.webp"]
 
 [project.optional-dependencies]
-test = ["coverage[toml]>=7.10,<8", "pip-audit>=2.9,<3", "numpy>=1.26", "tifffile>=2024.1", "numcodecs>=0.12"]
+test = ["coverage[toml]>=7.10,<8", "pip-audit>=2.9,<3", "numpy>=1.26", "tifffile>=2024.1", "numcodecs>=0.12", "imagecodecs>=2024.1"]
 inksdk = ["numpy>=1.26"]
 corte = ["numpy>=1.26", "tifffile>=2024.1", "numcodecs>=0.12"]
 hf = ["huggingface_hub>=0.24"]
+crop = ["numpy>=1.26", "tifffile>=2024.1", "imagecodecs>=2024.1"]
 
 [tool.coverage.run]
 source = ["ink_viewer"]

@@ -369,3 +369,20 @@ test('saved mask load rejects another grid, then replaces a matching grid with u
   assert.equal(vm.runInContext('H.w',context),8);assert.deepEqual(errors,[]);
  }finally{dom.window.close()}
 });
+
+test('a crop labels under its own canvas key and provenance, and the upload owner check accepts it',async()=>{
+ const {dom,w,context,errors}=await viewer();
+ try{
+  const crop={x:5,y:6,ancho:8,alto:4,ancho_mapa:80,alto_mapa:40};
+  w.recorteVista={key:()=>'|r5,6',info:()=>({...crop}),query:()=>'',showing(){},reduced(){},failed:()=>false,title:()=>' · crop at 5, 6 of 80 × 40'};
+  vm.runInContext('clave=null;show(true)',context);
+  click(w,'etiq');await waitFor(()=>w.document.getElementById('panel').hidden||w.annotationImageReady());
+  const name=vm.runInContext('H.nombre',context);assert.match(name,/\|r5,6\|c[^|]+$/,'crop window before the depth suffix');
+  assert.match(w.document.getElementById('title').textContent,/crop at 5, 6 of 80 × 40/);
+  const info=w.mascaraCorridaInfo(null,8,4);assert.deepEqual(JSON.parse(JSON.stringify(info.recorte)),crop);
+  assert.doesNotMatch(String(w.vetoGuardado({...info,clave_local:name})),/does not belong/);
+  delete w.recorteVista;
+  assert.equal(w.mascaraCorridaInfo(null,8,4).recorte,undefined,'whole maps carry no crop');
+  assert.deepEqual(errors,[]);
+ }finally{dom.window.close()}
+});
