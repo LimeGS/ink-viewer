@@ -415,6 +415,8 @@ Read [the architecture notes](architecture.md) before changing shared browser st
 ### Run checks
 
 ```sh
+ruff check .
+ruff format --check .
 python -m coverage erase
 python -m coverage run -m unittest discover -s tests/python -p 'test_*.py'
 python -m coverage combine
@@ -426,7 +428,7 @@ npm audit --audit-level=low
 
 For a faster test run without coverage, use `python -m unittest discover -s tests/python -p 'test_*.py'` and `npm test`.
 
-CI enforces **at least 90% line coverage separately for the complete Python package and all browser JavaScript files**, including unexecuted modules. This is not a 90% branch-coverage claim. Reports are available from the workflow's artifacts.
+CI enforces **at least 90% line coverage separately for the complete Python package and all browser JavaScript files**, including unexecuted modules. This is not a 90% branch-coverage claim. Python code is formatted with `ruff format` (line length 100) and linted with `ruff check`; CI runs both with the pinned version from the `test` extra. Reports are available from the workflow's artifacts.
 
 Tests use temporary datasets, local HTTP stand-ins and a simulated browser DOM with canvas/image replacements. For UI changes, also check a real browser with a small dataset: image loading, source switching, depth/model navigation, annotation import/export and save/reload where applicable. Unit coverage does not establish visual correctness, scientific quality or performance on your full dataset.
 

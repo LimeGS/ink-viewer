@@ -6,6 +6,7 @@ in a background thread, so drawing never waits on the network; a failed push is 
 retried with the next save. The token comes from HF_TOKEN or ``hf auth login`` and never reaches the browser.
 A dataset that does not exist yet is created private.
 """
+
 import queue
 import threading
 import time
@@ -13,22 +14,24 @@ import time
 
 class HFSync:
     def __init__(self, repo, api=None, operation=None):
-        if not isinstance(repo, str) or repo.count('/') != 1 or not all(repo.split('/')):
-            raise ValueError('--annotations-hf expects user/dataset')
+        if not isinstance(repo, str) or repo.count("/") != 1 or not all(repo.split("/")):
+            raise ValueError("--annotations-hf expects user/dataset")
         if api is None:
             try:
                 from huggingface_hub import HfApi
             except ImportError as e:
-                raise RuntimeError('--annotations-hf needs huggingface_hub: pip install "ink-viewer[hf]"') from e
+                raise RuntimeError(
+                    '--annotations-hf needs huggingface_hub: pip install "ink-viewer[hf]"'
+                ) from e
             api = HfApi()
         if operation is None:
             from huggingface_hub import CommitOperationAdd as operation
         self.repo, self.api, self.operation = repo, api, operation
         self.pending, self.failed = {}, {}
-        self.status = {'repo': repo, 'pushed': 0, 'last_push': None, 'last_error': None}
+        self.status = {"repo": repo, "pushed": 0, "last_push": None, "last_error": None}
         self._lock, self._queue = threading.Lock(), queue.Queue()
-        self.api.create_repo(repo, repo_type='dataset', private=True, exist_ok=True)
-        threading.Thread(target=self._worker, daemon=True, name='hf-sync').start()
+        self.api.create_repo(repo, repo_type="dataset", private=True, exist_ok=True)
+        threading.Thread(target=self._worker, daemon=True, name="hf-sync").start()
 
     def submit(self, files, message):
         """Queue {path in repo: bytes} for one commit; later saves of the same path replace earlier queued ones."""
@@ -60,14 +63,27 @@ class HFSync:
                     continue
                 try:
                     # Raw bytes, not BytesIO: huggingface_hub sends buffered IO through the slower HTTP path instead of Xet.
-                    operations = [self.operation(path_in_repo=p, path_or_fileobj=b) for p, b in sorted(files.items())]
-                    self.api.create_commit(self.repo, repo_type='dataset', operations=operations, commit_message=message)
+                    operations = [
+                        self.operation(path_in_repo=p, path_or_fileobj=b)
+                        for p, b in sorted(files.items())
+                    ]
+                    self.api.create_commit(
+                        self.repo,
+                        repo_type="dataset",
+                        operations=operations,
+                        commit_message=message,
+                    )
                     with self._lock:
-                        self.status.update(pushed=self.status['pushed'] + len(files), last_error=None,
-                                           last_push=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))
-                except Exception as e:  # keep the files for the next save; local copies are already safe
+                        self.status.update(
+                            pushed=self.status["pushed"] + len(files),
+                            last_error=None,
+                            last_push=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        )
+                except (
+                    Exception
+                ) as e:  # keep the files for the next save; local copies are already safe
                     with self._lock:
                         self.failed = files
-                        self.status['last_error'] = str(e)[:300]
+                        self.status["last_error"] = str(e)[:300]
             finally:
                 self._queue.task_done()
