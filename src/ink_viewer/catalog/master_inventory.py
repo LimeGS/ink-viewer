@@ -33,7 +33,7 @@ def dump(x):
 
 def root(source):
     if not source or source.tipo != "local":
-        raise ValueError("El inventario maestro requiere el catálogo local")
+        raise ValueError("The catalog inventory needs a local catalog source")
     return Path(source.origen) / "catalog"
 
 
@@ -189,9 +189,7 @@ CREATE INDEX segments_roll ON segments(roll);CREATE INDEX segments_name ON segme
     if before != after:
         conn.close()
         temp.unlink()
-        raise RuntimeError(
-            "Los índices cambiaron durante la compilación; se conserva el índice anterior"
-        )
+        raise RuntimeError("The indexes changed during the build; the previous index is kept")
     for k, v in [("fingerprints", before), ("summary", summary)]:
         conn.execute("INSERT INTO metadata VALUES(?,?)", (k, dump(v)))
     conn.commit()
@@ -209,7 +207,7 @@ def maybe_refresh(cat):
         return
     _checked[stamp] = now
     if not db_path(cat).exists():
-        raise FileNotFoundError("Inventario maestro aún no compilado")
+        raise FileNotFoundError("The catalog inventory is not built yet")
     with closing(sqlite3.connect("file:" + str(db_path(cat)) + "?mode=ro", uri=True)) as c:
         prior = json.loads(
             c.execute('SELECT value FROM metadata WHERE key="fingerprints"').fetchone()[0]
@@ -353,7 +351,7 @@ def get_run(source, key):
     with connection(source) as c:
         row = c.execute("SELECT data FROM runs WHERE key=?", (key,)).fetchone()
     if row is None:
-        raise FileNotFoundError("Corrida desconocida")
+        raise FileNotFoundError("Unknown run")
     return json.loads(row[0])
 
 
@@ -363,14 +361,14 @@ def map_info(source, run, depth, contrast="fixed"):
     Image.MAX_IMAGE_PIXELS = 1_000_000_000
     frame = run.get("maximum") if depth == "max" else run.get("frames", {}).get(str(depth))
     if not frame:
-        return {"available": False, "reason": "Esta corrida no tiene mapa para esa profundidad"}
+        return {"available": False, "reason": "This run has no map at that depth"}
     allowed = (run.get("frameContrasts") or {}).get(
         frame, run.get("availableContrasts") or ["fixed"]
     )
     if contrast not in allowed:
         return {
             "available": False,
-            "reason": "Este contraste no está publicado para ese plano",
+            "reason": "This contrast is not published for that plane",
             "state": "NOT_DECLARED_FOR_FRAME",
             "available_contrasts": allowed,
         }
@@ -378,13 +376,13 @@ def map_info(source, run, depth, contrast="fixed"):
     if rel is None:
         return {
             "available": False,
-            "reason": "Ruta histórica fuera del catálogo; falta reconciliar el mapa",
+            "reason": "Historical path outside the catalog; the map is not reconciled yet",
             "declared_path": frame,
         }
     path = (Path(source.origen) / rel).resolve()
     cat = root(source).resolve()
     if not path.is_relative_to(cat):
-        raise ValueError("Mapa fuera del catálogo")
+        raise ValueError("Map outside the catalog")
     original_path = str(path)
     representation = "native"
     try:
@@ -460,7 +458,7 @@ def display_pair(record, bodies):
     if not (
         kind.startswith("a mano") or kind in ("declared_manual_snapshot", "306b_manual_snapshot")
     ):
-        raise ValueError("La normalización visual requiere autoría manual declarada")
+        raise ValueError("Visual normalization needs declared manual authorship")
     result = []
     proof = []
     metadata = []
@@ -469,13 +467,13 @@ def display_pair(record, bodies):
             im.load()
             raw = im.info.get("vesuvius:mascara_corrida")
             if not raw:
-                raise ValueError("Faltan metadatos originales para la representación visual")
+                raise ValueError("Original metadata missing for the visual rendering")
             metadata.append(json.loads(raw))
     shared = [
         {k: v for k, v in meta.items() if k != "editado_fuera_del_visor"} for meta in metadata
     ]
     if shared[0] != shared[1]:
-        raise ValueError("Los metadatos geométricos del par difieren")
+        raise ValueError("The pair's geometric metadata differ")
     display_meta = dict(shared[0])
     if any("editado_fuera_del_visor" in meta for meta in metadata):
         display_meta["display_original_edit_notes"] = {
@@ -492,18 +490,16 @@ def display_pair(record, bodies):
                 or getattr(im, "n_frames", 1) != 1
                 or not im.info.get("vesuvius:mascara_corrida")
             ):
-                raise ValueError("Faltan metadatos originales para la representación visual")
+                raise ValueError("Original metadata missing for the visual rendering")
             channels = im.convert("RGBA").split()
             if channels[3].getextrema() != (255, 255):
-                raise ValueError("La representación visual no interpreta transparencia")
+                raise ValueError("The visual rendering does not interpret transparency")
             for channel in channels[:3]:
                 if any(n and v not in (0, 1, 254, 255) for v, n in enumerate(channel.histogram())):
-                    raise ValueError(
-                        "Hay valores fuera de 0/1/254/255; hace falta una receta de etiquetas"
-                    )
+                    raise ValueError("Values outside 0/1/254/255; a label recipe is needed")
             classes = [ch.point(lambda n: 255 if n >= 254 else 0) for ch in channels[:3]]
             if any(ImageChops.difference(classes[0], ch).getbbox() for ch in classes[1:]):
-                raise ValueError("Los canales discrepan en la clase; no se normaliza")
+                raise ValueError("Channels disagree on the class; not normalized")
             info = PngImagePlugin.PngInfo()
             info.add_itxt("vesuvius:mascara_corrida", json.dumps(display_meta, ensure_ascii=False))
             out = io.BytesIO()
@@ -538,20 +534,20 @@ def overlay(source, params, validate_pair):
     reasons = []
     result = {"eligible": False, "reasons": reasons, "basis": None}
     if not r:
-        reasons.append("Versión de máscara desconocida")
+        reasons.append("Unknown mask version")
         return result
     if (
         r.get("association") != "catalog_membership"
         or r.get("segment") != run["inventory_segment"]
         or r["roll"] != run["inventory_roll"]
     ):
-        reasons.append("La asociación de superficie no coincide o está pendiente")
+        reasons.append("The surface association does not match or is pending")
         return result
     if r.get("depth") != (None if depth == "max" else depth):
-        reasons.append("La profundidad de la máscara no coincide")
+        reasons.append("The mask depth does not match")
         return result
     if len(r["assets"]) != 2 or r.get("unit") != "I/S":
-        reasons.append("Esta representación no es un par I/S apto para superposición")
+        reasons.append("This rendering is not an I/S pair suitable for overlay")
         return result
     m = map_info(source, run, depth, params.get("contrast", ["fixed"])[0])
     result["map"] = m
@@ -560,7 +556,7 @@ def overlay(source, params, validate_pair):
         return result
     if not m.get("original_available", True):
         reasons.append(
-            "Sólo está publicada la vista reducida del mapa; falta el original para validar la superposición"
+            "Only the reduced view of the map is published; the original is needed to validate the overlay"
         )
         return result
     orientation, orientation_stamp = orientation_index(source)
@@ -587,25 +583,25 @@ def overlay(source, params, validate_pair):
             sc = validate_pair(*bodies, None, r["segment"], base, depth, r["roll"])
         except ValueError as error:
             if str(error) not in (
-                "La mascara debe ser opaca y gris: canales RGB identicos",
-                "Clases de mascara invalidas: solo 0 y 255",
+                "The mask must be opaque grey: identical RGB channels",
+                "Invalid mask classes: only 0 and 255",
             ):
                 raise
             display, proof = display_pair(r, bodies)
             sc = validate_pair(*display, None, r["segment"], base, depth, r["roll"])
             result["display_representation"] = proof
         if sc is None:
-            reasons.append("Faltan metadatos de corrida y cuadrícula en las máscaras")
+            reasons.append("The masks lack run and grid metadata")
         else:
             if [sc.get("ancho"), sc.get("alto")] != m["dimensions"]:
-                reasons.append("Las dimensiones del mapa y la máscara difieren")
+                reasons.append("Map and mask dimensions differ")
             if sc.get("cara") != run.get("catalogMeta", {}).get("cara"):
-                reasons.append("La cara/orientación declarada no coincide")
+                reasons.append("The declared face/orientation does not match")
             mesh = (run.get("renderGrid") or {}).get("mesh_sha256") or run.get(
                 "meshAssociation", {}
             ).get("meshSha256")
             if not mesh or sc.get("malla_sha256") != mesh:
-                reasons.append("Falta coincidencia de identidad de malla")
+                reasons.append("Mesh identity does not match")
             same_run = (
                 sc.get("run_id") == run.get("id")
                 and bool(sc.get("directorio_fuente"))
@@ -614,11 +610,9 @@ def overlay(source, params, validate_pair):
             grid = run.get("renderGrid") or run.get("catalogMeta", {}).get("render_grid") or {}
             same_grid = bool(sc.get("grid_id")) and sc.get("grid_id") == grid.get("grid_id")
             if not same_run and not same_grid:
-                reasons.append(
-                    "No hay evidencia de la misma corrida/cuadrícula; no se transforma la máscara"
-                )
+                reasons.append("No evidence of the same run/grid; the mask is not transformed")
             if sc.get("grid_id") and grid.get("grid_id") and sc["grid_id"] != grid["grid_id"]:
-                reasons.append("La identidad de cuadrícula es diferente")
+                reasons.append("The grid identity differs")
             saved_orientation = (sc.get("orientacion") or {}).get("correccion")
             current_orientation = orientation.get(run.get("id"))
             if (
@@ -626,7 +620,7 @@ def overlay(source, params, validate_pair):
                 and current_orientation is not None
                 and list(saved_orientation[:3]) != list(current_orientation[:3])
             ):
-                reasons.append("La orientación registrada de la máscara y la corrida difiere")
+                reasons.append("The recorded orientation of the mask and the run differ")
             if not reasons:
                 result.update(
                     eligible=True,
@@ -646,7 +640,7 @@ def overlay(source, params, validate_pair):
 def display_asset(source, params, validate_pair):
     qualified = overlay(source, params, validate_pair)
     if not qualified["eligible"]:
-        raise ValueError("Superposición no verificada: " + "; ".join(qualified["reasons"]))
+        raise ValueError("Overlay not verified: " + "; ".join(qualified["reasons"]))
     r = canonical.inventory(source)["by_id"][params["mask"][0]]
     bodies = [canonical.read_asset(source, a) for a in r["assets"]]
     if qualified.get("display_representation"):
@@ -665,7 +659,7 @@ def native_info(source, params, preview=False):
     data = canonical.inventory(source)
     r = data["by_id"].get(params["mask"][0]) if data else None
     if not r:
-        raise FileNotFoundError("Versión desconocida")
+        raise FileNotFoundError("Unknown version")
     a = next((a for a in r["assets"] if a["role"] == params.get("role", ["I"])[0]), None)
     if a is None:
         raise FileNotFoundError("Rol inexistente")
@@ -674,7 +668,7 @@ def native_info(source, params, preview=False):
         frame = int(params.get("page", ["0"])[0])
         count = getattr(im, "n_frames", 1)
         if frame < 0 or frame >= count:
-            raise ValueError("Página fuera del archivo")
+            raise ValueError("Page outside the file")
         im.seek(frame)
         if not preview:
             return {

@@ -4,40 +4,8 @@
  if(!cfg)try{const x=new XMLHttpRequest();x.open('GET','/api/origen',false);x.send();if(x.status===200)cfg=JSON.parse(x.responseText)}catch(e){}
  window.VISOR_ORIGEN=cfg;
  window.visorKey=k=>cfg&&cfg.id?k+'@'+cfg.id:k;
- const errors={
-  'Ruta de datos invalida':'Invalid data path',
-  'La ruta sale de la carpeta elegida':'The path is outside the selected folder',
-  'Usa una URL HTTP/HTTPS base, sin credenciales, query ni fragmento':'Use an HTTP/HTTPS base URL without credentials, query or fragment',
-  'URL base invalida':'Invalid base URL',
-  'Falta la carpeta o URL de origen':'Missing source folder or URL',
-  'Usa s3://bucket/prefijo':'Use s3://bucket/prefix',
-  'Origen admitido: carpeta local, HTTP/HTTPS o s3://':'Supported sources: local folder, HTTP/HTTPS or s3://',
-  'La carpeta local no existe':'The local folder does not exist',
-  'Los campos de configuracion deben ser texto':'Configuration fields must be text',
-  'Perfil, endpoint y region son opciones de S3':'Profile, endpoint and region are S3 options',
-  'La carpeta de anotaciones debe existir':'The annotation folder must exist',
-  'HTTP no ofrece un listado estandar: genera el manifiesto en la carpeta del servidor':'HTTP has no standard directory listing: generate the manifest on the server',
-  'Range invalido':'Invalid range','Range vacio':'Empty range',
-  'Layout del indice invalido':'Invalid index layout',
-  'El manifiesto generado debe ser una lista':'The generated manifest must be a list',
-  'No hay manifiesto: ejecuta generar_manifest.py sobre la carpeta del catalogo o usa all-gallery/':'No manifest: run generar_manifest.py on the catalog folder or use all-gallery/',
-  'Carpeta de historial invalida':'Invalid history folder',
-  'Solicitud de configuracion no autorizada':'Unauthorized configuration request',
-  'Origen del navegador no autorizado':'Unauthorized browser origin',
-  'Esperaba configuracion JSON de hasta 16 KiB':'Expected JSON configuration up to 16 KiB',
-  'Campos de configuracion invalidos':'Invalid configuration fields',
-  'El origen cambio en otra pestana; recarga el visor':'Source changed in another tab; reload the viewer',
-  'Origen distinto o pestana desactualizada; recarga antes de guardar':'Different source or outdated tab; reload before saving',
-  'Origen de solo lectura: configura una carpeta de anotaciones':'Read-only source: configure an annotation folder',
-  'El archivo pertenece a otro rollo':'The file belongs to another scroll',
-  'Ruta TIFF o escala invalida':'Invalid TIFF path or scale',
-  'Mapa TIFF mayor a 256 MiB: genera previews PNG':'TIFF map exceeds 256 MiB: generate PNG previews',
-  'Se admite TIFF 2D entero; exporta los stacks o float a PNG':'Only 2D integer TIFF is supported; export stacks or floating-point maps to PNG',
-  'El manifiesto debe ser una lista':'The manifest must be a list',
-  'No es una cabecera PNG':'Not a PNG header'
- };
- window.visorTexto=t=>{let text=String(t||'');for(const [from,to] of Object.entries(errors))text=text.replaceAll(from,to);
-  return text.replace(/Indice mayor a (\d+) MiB/g,'Index exceeds $1 MiB')};
+ /* Server messages are already English; kept as the single place that formats them for the UI. */
+ window.visorTexto=t=>String(t||'');
  window.visorPuedeGuardar=!cfg||cfg.escritura;
  if(!cfg)return;
  const originalFetch=window.fetch.bind(window);

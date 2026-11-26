@@ -34,10 +34,10 @@ def ruta_dentro(root, rel, zarr_meta=False):
         or any(p in (".", "..") for p in parts)
         or (hidden and not allowed)
     ):
-        raise ValueError("Ruta de datos invalida")
+        raise ValueError("Invalid data path")
     path = (root / rel).resolve()
     if not path.is_relative_to(root.resolve()):
-        raise ValueError("La ruta sale de la carpeta elegida")
+        raise ValueError("The path is outside the selected folder")
     return path
 
 
@@ -51,9 +51,9 @@ def url_http(value):
         or u.query
         or u.fragment
     ):
-        raise ValueError("Usa una URL HTTP/HTTPS base, sin credenciales, query ni fragmento")
+        raise ValueError("Use an HTTP/HTTPS base URL without credentials, query or fragment")
     if any(p in (".", "..") for p in u.path.split("/")):
-        raise ValueError("URL base invalida")
+        raise ValueError("Invalid base URL")
     return value.rstrip("/")
 
 
@@ -98,30 +98,30 @@ class Fuente:
 
     def __init__(self, origen, perfil="", endpoint="", region="", anotaciones=""):
         if not isinstance(origen, str) or not origen.strip():
-            raise ValueError("Falta la carpeta o URL de origen")
+            raise ValueError("Missing source folder or URL")
         origen = origen.strip()
         if origen.startswith(("http://", "https://")):
             self.tipo, self.origen = "http", url_http(origen)
         elif origen.startswith("s3://"):
             u = urlsplit(origen)
             if not u.netloc or u.query or u.fragment or u.username or u.password:
-                raise ValueError("Usa s3://bucket/prefijo")
+                raise ValueError("Use s3://bucket/prefix")
             prefix = u.path.strip("/")
             if prefix:
                 ruta_dentro(Path("/"), prefix)
             self.tipo, self.origen = "s3", "s3://" + u.netloc + ("/" + prefix if prefix else "")
         else:
             if "://" in origen:
-                raise ValueError("Origen admitido: carpeta local, HTTP/HTTPS o s3://")
+                raise ValueError("Supported sources: local folder, HTTP/HTTPS or s3://")
             root = Path(origen).expanduser().resolve()
             if not root.is_dir():
-                raise ValueError("La carpeta local no existe")
+                raise ValueError("The local folder does not exist")
             self.tipo, self.origen = "local", str(root)
         for value in (perfil, endpoint, region, anotaciones):
             if not isinstance(value, str):
-                raise ValueError("Los campos de configuracion deben ser texto")
+                raise ValueError("Configuration fields must be text")
         if self.tipo != "s3" and (perfil or endpoint or region):
-            raise ValueError("Perfil, endpoint y region son opciones de S3")
+            raise ValueError("Profile, endpoint and region are S3 options")
         self.perfil, self.endpoint, self.region = (
             perfil.strip(),
             url_http(endpoint) if endpoint else "",
@@ -129,7 +129,7 @@ class Fuente:
         )
         self.anotaciones = str(Path(anotaciones).expanduser().resolve()) if anotaciones else ""
         if self.anotaciones and not Path(self.anotaciones).is_dir():
-            raise ValueError("La carpeta de anotaciones debe existir")
+            raise ValueError("The annotation folder must exist")
         self.id = hashlib.sha256((self.origen + "\n" + self.endpoint).encode()).hexdigest()[:20]
         self._s3, self._lock = None, threading.Lock()
         with _annotation_guard:
@@ -155,7 +155,7 @@ class Fuente:
             )
         if self.tipo == "http":
             raise ValueError(
-                "HTTP no ofrece un listado estandar: genera el manifiesto en la carpeta del servidor"
+                "HTTP has no standard directory listing: generate the manifest on the server"
             )
         u = urlsplit(self.origen)
         prefix = "/".join(filter(None, (u.path.strip("/"), rel)))
@@ -188,7 +188,7 @@ class Fuente:
             return tail
         sample, sep, path = tail.partition("/")
         if not sep or sample != self.scroll:
-            raise FileNotFoundError("El archivo pertenece a otro rollo")
+            raise FileNotFoundError("The file belongs to another scroll")
         return path
 
     def config(self):
@@ -250,7 +250,7 @@ class Fuente:
     def abrir(self, rel, rango=None, head=False, zarr_meta=False):
         ruta_dentro(Path("/"), rel, zarr_meta)
         if rango and not re.fullmatch(r"bytes=\d*-\d*", rango):
-            raise ValueError("Range invalido")
+            raise ValueError("Invalid range")
         if self.tipo == "local":
             path = ruta_dentro(Path(self.origen), rel, zarr_meta)
             if not path.is_file():
@@ -270,12 +270,12 @@ class Fuente:
             if rango and not head:
                 a, b = rango[6:].split("-")
                 if not a and not b:
-                    raise ValueError("Range vacio")
+                    raise ValueError("Empty range")
                 start, end = (
                     (int(a), min(int(b), end) if b else end) if a else (max(0, size - int(b)), end)
                 )
                 if start > end or start >= size:
-                    raise urllib.error.HTTPError(rel, 416, "Range fuera del archivo", {}, None)
+                    raise urllib.error.HTTPError(rel, 416, "Range outside the file", {}, None)
                 status = 206
                 headers["Content-Range"] = f"bytes {start}-{end}/{size}"
             headers["Content-Length"] = str(max(0, end - start + 1))
@@ -329,7 +329,7 @@ class Fuente:
             with self.abrir(name) as (_, _, body):
                 data = body.read(limite + 1)
             if len(data) > limite:
-                raise ValueError(f"Indice mayor a {limite // 2**20} MiB")
+                raise ValueError(f"Index over {limite // 2**20} MiB")
             return json.loads(data)
         except FileNotFoundError:
             return {}
@@ -349,10 +349,10 @@ class Fuente:
                     or layout == "sample"
                     and not re.fullmatch(r"PHerc[A-Za-z0-9]+", scroll or "")
                 ):
-                    raise ValueError("Layout del indice invalido")
+                    raise ValueError("Invalid index layout")
                 data = self.indice("_viewer/manifest.json", limite=256 * 2**20)
                 if not isinstance(data, list):
-                    raise ValueError("El manifiesto generado debe ser una lista")
+                    raise ValueError("The generated manifest must be a list")
                 self.layout, self.scroll, self.manifest_rel = (
                     layout,
                     scroll,
@@ -390,7 +390,7 @@ class Fuente:
         if denied:
             raise denied
         raise ValueError(
-            "No hay manifiesto: ejecuta generar_manifest.py sobre la carpeta del catalogo o usa all-gallery/"
+            "No manifest: run ink-viewer-manifest on the catalog folder or use all-gallery/"
         )
 
     def mascara_local(self, rel):
@@ -402,7 +402,7 @@ class Fuente:
     def guardar_mascara(self, rel, body):
         path = self.mascara_local(rel)
         if path is None:
-            raise PermissionError("Origen de solo lectura: configura una carpeta de anotaciones")
+            raise PermissionError("Read-only source: configure an annotation folder")
         path.parent.mkdir(parents=True, exist_ok=True)
         with self.mascara_lock:
             name = None
@@ -412,7 +412,7 @@ class Fuente:
                     if not history.resolve().is_relative_to(
                         (Path(self.anotaciones) / self.id).resolve()
                     ):
-                        raise ValueError("Carpeta de historial invalida")
+                        raise ValueError("Invalid history folder")
                     history.mkdir(exist_ok=True)
                     shutil.copy2(path, history / (path.name + "." + str(time.time_ns())))
                 with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as f:
@@ -429,7 +429,7 @@ class Fuente:
         root.mkdir(parents=True, exist_ok=True)
         path = root / ".annotation.lock"
         if not path.resolve().is_relative_to(root.resolve()):
-            raise ValueError("Lock de anotaciones invalido")
+            raise ValueError("Invalid annotation lock")
         with self.mascara_lock, path.open("a+b") as stream:
             fcntl.flock(stream, fcntl.LOCK_EX)
             try:
@@ -444,17 +444,17 @@ class Fuente:
         alias always contains a complete pair. Previous generations remain on disk.
         """
         if not self.anotaciones:
-            raise PermissionError("Origen de solo lectura: configura una carpeta de anotaciones")
+            raise PermissionError("Read-only source: configure an annotation folder")
         root = ruta_dentro(Path(self.anotaciones), self.id)
         if any("/" in name or name.startswith(".") for name in files):
-            raise ValueError("Nombre de mascara invalido")
+            raise ValueError("Invalid mask name")
         with self._escritura_mascaras():
             targets = [root / rel for rel in dict.fromkeys(directories)]
             for rel in directories:
                 ruta_dentro(root, rel)
             generations = root / ".mask-generations"
             if not generations.resolve().is_relative_to(root.resolve()):
-                raise ValueError("Carpeta de generaciones invalida")
+                raise ValueError("Invalid generations folder")
             generations.mkdir(parents=True, exist_ok=True)
             generation = Path(tempfile.mkdtemp(prefix="pair-", dir=generations))
             previous, published, temporary = [], [], []
@@ -465,7 +465,7 @@ class Fuente:
                         for old in target.iterdir():
                             if old.is_file() and old.name not in files:
                                 if not old.resolve().is_relative_to(root.resolve()):
-                                    raise ValueError("Archivo de mascara fuera de anotaciones")
+                                    raise ValueError("Mask file outside the annotations")
                                 if not (generation / old.name).exists():
                                     os.link(old, generation / old.name)
                         history = generation / ".history"
@@ -474,7 +474,7 @@ class Fuente:
                             old = target / name
                             if old.is_file():
                                 if not old.resolve().is_relative_to(root.resolve()):
-                                    raise ValueError("Historial de mascara fuera de anotaciones")
+                                    raise ValueError("Mask history outside the annotations")
                                 os.link(old, history / (name + "." + uuid.uuid4().hex))
                 for name, body in files.items():
                     with (generation / name).open("wb") as stream:

@@ -61,7 +61,7 @@ def construir(source, scroll=None, verificar_mallas=False):
         scroll = scroll or inferred
         if not SAMPLE.fullmatch(scroll):
             raise ValueError(
-                "La carpeta con segments/ necesita un nombre PHerc... o --scroll PHerc..."
+                "A folder holding segments/ needs a PHerc... name or --scroll PHerc..."
             )
         layout, samples = "sample", [(scroll, "")]
     else:
@@ -75,7 +75,7 @@ def construir(source, scroll=None, verificar_mallas=False):
             if directory and SAMPLE.fullmatch(name) and (not scroll or name == scroll)
         ]
         if not samples:
-            raise ValueError("No hay segments/ ni carpetas PHerc... en el origen")
+            raise ValueError("The source has no segments/ or PHerc... folders")
         scroll = None
     report = {
         "schema": "vesuvius.viewer-index.v1",
@@ -323,14 +323,14 @@ def main(argv=None):
             else None
         )
         if not a.dry_run and output is None:
-            raise ValueError("S3 necesita --salida; HTTP se indexa desde el disco del servidor")
+            raise ValueError("S3 needs --salida; index an HTTP source on the server's disk")
         if (
             output
             and not a.reemplazar
             and not a.dry_run
             and any((output / "_viewer" / n).exists() for n in ("manifest.json", "index-info.json"))
         ):
-            raise ValueError("Ya existe un indice generado; usa --reemplazar para regenerarlo")
+            raise ValueError("A generated index already exists; use --replace to regenerate it")
         manifest, report = construir(source, a.scroll, a.verificar_mallas)
         if not a.dry_run:
             guardar_json(output / "_viewer" / "manifest.json", manifest)
