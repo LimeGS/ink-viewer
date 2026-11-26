@@ -26,6 +26,7 @@ https://github.com/user-attachments/assets/d47ffca1-7ff0-44b8-ae6c-ada94b753237
 - Run a public ink model on the open segment through [ink-sdk](https://github.com/LimeGS/ink-sdk) (optional) and add its maps to the list.
 - Click a map point to see the CT cross-section through it, with the segment's mesh drawn on top (optional).
 - Browse every ink map the Vesuvius Challenge team publishes, indexed from the open-data bucket's own catalog and refreshed daily; gigapixel maps open as a reduced view and are labeled one full-resolution crop at a time.
+- Review and correct VSkinox's [Herculaneum ink-label dataset](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels) on its own CT layers, read straight from Hugging Face.
 - Mirror saved annotations to a Hugging Face dataset (optional).
 
 The frontend uses JavaScript, HTML and CSS; Python serves data and validates saves. There is no frontend build step. The viewer does not train models or render 3D meshes; inference runs only through the optional ink-sdk integration, and CT is read only for cross-sections. Missing scores and calibration remain unknown.
@@ -121,6 +122,15 @@ ink-viewer --source official
 ```
 
 Indexes every ink map in the public open-data bucket from its `metadata.json` (no credentials, no manifest to prepare) and refreshes the index daily. Maps too large to label in a browser open as a reduced view; **Label a crop** opens an 8192 px full-resolution window to label. See [the guide](docs/guide.md#browse-the-official-vesuvius-challenge-maps). Cropping these TIFF maps needs the `crop` extra: `python -m pip install ".[crop]"`.
+
+### Herculaneum ink labels (VSkinox)
+
+```sh
+python -m pip install ".[corte]"
+ink-viewer --source ink-labels --annotations /path/to/annotations
+```
+
+Opens [VSkinox's ink-label dataset](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels) (1,609 squares from 10 scrolls and fragments, one labelling rule for every source) straight from Hugging Face, with nothing to download first. Each entry is one series whose depth offsets are its 21 CT surface layers; search by entry name, or by quality and role (`q5`, `reference`). In **Label**, **Mask files → load saved mask** brings in the dataset label as a mask pair (ink, sure background, and ignore left unpainted) to review and correct; corrections are saved as ordinary pairs in the annotations folder. CC BY-NC 4.0; see [the guide](docs/guide.md#review-the-herculaneum-ink-label-dataset).
 
 <details>
 <summary><b>Public S3 or HTTP, without credentials</b></summary>

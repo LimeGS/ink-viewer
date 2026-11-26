@@ -1464,7 +1464,7 @@ def main():
         "--origen",
         dest="origen",
         default=os.environ.get("VISOR_ORIGEN"),
-        help='dataset root: local folder, HTTP/HTTPS URL, s3://bucket/prefix, or "official" for the Vesuvius Challenge open-data bucket; no fallback to another source',
+        help='dataset root: local folder, HTTP/HTTPS URL, s3://bucket/prefix, "official" for the Vesuvius Challenge open-data bucket, or "ink-labels" for the Herculaneum ink-label dataset on Hugging Face; no fallback to another source',
     )
     ap.add_argument(
         "--annotations",

@@ -94,6 +94,11 @@ class Fuente:
             from ink_viewer.server.fuente_oficial import FuenteOficial
 
             cls = FuenteOficial
+        # "ink-labels" is VSkinox's Herculaneum ink-label dataset on Hugging Face (fuente_etiquetas.py).
+        elif cls is Fuente and isinstance(origen, str) and origen.strip().lower() == "ink-labels":
+            from ink_viewer.server.fuente_etiquetas import FuenteEtiquetas
+
+            cls = FuenteEtiquetas
         return super().__new__(cls)
 
     def __init__(self, origen, perfil="", endpoint="", region="", anotaciones=""):

@@ -88,6 +88,21 @@ ink-viewer --source official
 
 The index comes from the bucket's own `metadata.json` (the team's catalog of samples, segments and data items). On start, and when the cached copy is older than `VISOR_OFFICIAL_MAX_AGE_HOURS` (default 24), the server downloads it, keeps one entry per `ink-detection` item with its model, volume and direction, and caches the result under `VISOR_OFFICIAL_CACHE` (default `~/.cache/ink-viewer/official`). New team runs therefore appear on the next refresh; if a refresh fails, the previous index is kept. Maps are read from the bucket over HTTPS; 1/8-scale views use the JPEG the team publishes beside each map instead of decoding the full-resolution TIFF. Maps too large for a browser at full resolution (over `VISOR_MAX_FULLRES_PIXELS`, default 150 Mpx; Chrome refuses canvases over 268 Mpx and labeling lags well before that; whole PHercParis4 segments reach 2.4 Gpx) open as a reduced, browse-only view: the 1/4 map, or the published 1/8 JPEG when the map is also over `VISOR_MAX_MAP_PIXELS` (default 1 Gpx). Labeling needs full resolution: on these maps press **Label a crop**, then click the reduced view, and an 8192 px full-resolution window opens there (on a 4096 px grid, so clicking near the same place reopens the same crop and its saved mask) that labels like any map (**Whole map** goes back). Each crop keeps its own mask pair under `labels/.../recorte-x<x>-y<y>-<width>x<height>/`, with the window and the whole map's size recorded as `recorte` in its provenance, so crops never overwrite each other or a whole-map pair; cross-sections from a crop map back to the whole map. Cropping maps over 1 Gpx reads only the strips or tiles inside the window and needs `pip install "ink-viewer[crop]"` (tifffile and imagecodecs). Cross-sections on the reduced view use the proportional mapping. Mesh association is reported as unverified. Annotations work as with any other source when `--annotations` is given.
 
+## Review the Herculaneum ink-label dataset
+
+`--source ink-labels` opens [VSkinox's Herculaneum ink-label dataset](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels) (CC BY-NC 4.0) for review and correction, read anonymously from Hugging Face:
+
+```sh
+python -m pip install ".[corte]"   # numcodecs, to decode the CT layers
+ink-viewer --source ink-labels --annotations /path/to/annotations
+```
+
+The dataset stores 512 px squares on the 9.362 µm surface grid, `<scroll>/<segment>/<entry>/`, each with its CT surface layers (`layers.zarr`, 21 layers) and labels in several styles with the values 0 sure background, 1 sure ink, 2 ignore and 255 outside the papyrus. On start, and when the cached copy is older than `VISOR_INKLABELS_MAX_AGE_HOURS` (default 24), the server reads `entries.csv` and builds the index under `VISOR_INKLABELS_CACHE` (default `~/.cache/ink-viewer/ink-labels`): one series per entry, named after the entry, with its quality (1-5), role (`reference`, `machine_1um`, `machine`) and labelling family in its model name (for example `q5-reference-ecarts`), so the search box filters by them. Scroll folders map to viewer samples (`PHercParis4_Scroll1` → `PHercParis4`, `Fragments` → `PHercFragments`).
+
+The depth offsets of a series are its CT layers, offset from the surface layer recorded in `layers.zarr`; they are decoded from the zarr chunks on request and kept for the last 16 entries. An entry published without layers shows its label instead.
+
+In **Label**, **Mask files → load saved mask** loads the dataset label as the viewer's mask pair with the dataset's own training conversion: `inklabels = (v == 1)`, `supervision_mask = (v in {0, 1})`, so ignore and outside-papyrus pixels stay unpainted. As everywhere in the viewer, nothing replaces the canvas without that click. `VISOR_INKLABELS_STYLE` chooses the style (`A` full letter by default, or `B`, `C`, `D`). Corrections are saved as ordinary pairs in the annotations folder, per depth, and are what the viewer reopens afterwards; the dataset itself is never written. `VISOR_INKLABELS_URL` points to another copy with the same layout (a local folder or an HTTP root). Per the dataset card, evaluate models only on `role == reference` entries; the machine-made ones are for training.
+
 ## Connect to public S3
 
 ### Browse an already indexed public bucket without AWS credentials
