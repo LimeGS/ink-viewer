@@ -252,3 +252,16 @@ class Commands(unittest.TestCase):
             )
         with self.assertRaises(ValueError):
             publish_preview.code_bundle(self.root, "invalid", self.root / "bad.bundle")
+        failure = publish_preview.subprocess.CalledProcessError(128, ["git", "fetch"])
+        stderr = io.StringIO()
+        with (
+            patch.object(publish_preview.subprocess, "run", side_effect=failure),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as exit_,
+        ):
+            self.invoke(
+                publish_preview,
+                ["--host", "user@example.invalid", "--remote-site", "/s", "--remote-code", "/c"],
+            )
+        self.assertEqual(exit_.exception.code, 128)
+        self.assertEqual(stderr.getvalue(), "git failed with exit code 128\n")

@@ -76,14 +76,23 @@ def export(catalog, tasks, receipts):
     }
 
 
-if __name__ == "__main__":
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--catalogo", type=Path, required=True)
     ap.add_argument("--tareas", type=Path, required=True)
     ap.add_argument("--filas", type=Path, required=True)
     ap.add_argument("--salida", type=Path, required=True)
-    a = ap.parse_args()
-    data = export(a.catalogo, a.tareas, a.filas)
-    with a.salida.open("x") as f:
-        json.dump(data, f)
+    a = ap.parse_args(argv)
+    try:
+        data = export(a.catalogo, a.tareas, a.filas)
+        with a.salida.open("x") as f:
+            json.dump(data, f)
+    except FileExistsError:
+        ap.error(f"{a.salida} already exists; choose another --salida")
+    except (OSError, ValueError) as e:
+        ap.error(str(e))
     print(json.dumps({"segments_with_controls": len(data["laminas"]), "output": str(a.salida)}))
+
+
+if __name__ == "__main__":
+    main()

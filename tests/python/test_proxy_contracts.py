@@ -152,3 +152,30 @@ class ProxyContracts(unittest.TestCase):
             ):
                 runpy.run_module("ink_viewer.catalog.exportar_compuertas", run_name="__main__")
         self.assertEqual(json.loads(output.read_text())["laminas"], {})
+        argv = ["--catalogo", str(self.root), "--tareas", str(tasks), "--filas", str(receipts)]
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit):
+            gates.main([*argv, "--salida", str(output)])
+        self.assertIn("already exists", stderr.getvalue())
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            gates.main([*argv, "--salida", str(self.root / "missing/out.json")])
+
+    def test_unexpected_errors_are_logged_with_traceback(self):
+        handler = object.__new__(proxy.Handler)
+        handler.command, handler.path = "GET", "/api/x"
+        try:
+            raise RuntimeError("boom")
+        except RuntimeError as error:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(handler._inesperado(error), "boom")
+        logged = (self.root / "log").read_text()
+        self.assertIn("GET /api/x: RuntimeError('boom')", logged)
+        self.assertIn("Traceback", logged)
+
+    def test_inventory_cli_reports_errors_without_traceback(self):
+        from ink_viewer.catalog import master_inventory
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr), self.assertRaises(SystemExit):
+            master_inventory.main(["--catalog", str(self.root / "missing")])
+        self.assertNotIn("Traceback", stderr.getvalue())

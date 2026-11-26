@@ -22,6 +22,7 @@ import struct
 import tempfile
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 from functools import lru_cache
@@ -403,6 +404,11 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass  # log() records what matters; no per-request access log
 
+    def _inesperado(self, error):
+        """An unexpected failure: the client gets its message, the log keeps the traceback."""
+        log(f"!! {self.command} {self.path}: {error!r}\n{traceback.format_exc().rstrip()}")
+        return str(error)
+
     def do_HEAD(self):
         self.fuente = getattr(self.server, "fuente", None)
         if self._codigo(head=True):
@@ -555,7 +561,7 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError, TypeError, OSError) as e:
             return self._json({"error": str(e)}, 400)
         except Exception as e:
-            return self._json({"error": str(e)}, 502)
+            return self._json({"error": self._inesperado(e)}, 502)
 
     def _fuente_archivo(self, rel, head=False):
         source = self.fuente
@@ -1053,7 +1059,7 @@ class Handler(SimpleHTTPRequestHandler):
                         self.fuente.tipo,
                     )
                 except Exception as ex:
-                    return self.send_error(502, str(ex))
+                    return self.send_error(502, self._inesperado(ex))
             if code == 404 and path in OPTIONAL_MANIFESTS and not head:
                 return self._send_bytes(
                     b"// Optional manifest absent.\n", "application/javascript", self.fuente.tipo
@@ -1066,7 +1072,7 @@ class Handler(SimpleHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
-            return self.send_error(502, str(e))
+            return self.send_error(502, self._inesperado(e))
 
     def do_GET(self):
         self.fuente = getattr(self.server, "fuente", None)
@@ -1092,7 +1098,7 @@ class Handler(SimpleHTTPRequestHandler):
                 except (ValueError, FileNotFoundError):
                     return self.send_error(404, f"Unknown scroll {q}")
                 except Exception as e:
-                    return self.send_error(502, str(e))
+                    return self.send_error(502, self._inesperado(e))
                 proxy = (
                     {"tipo": self.fuente.tipo, "origen": self.fuente.origen} if self.fuente else {}
                 )
@@ -1218,7 +1224,7 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError, TypeError) as error:
             return self._json({"error": str(error)}, 400)
         except Exception as error:
-            return self._json({"error": str(error)}, 502)
+            return self._json({"error": self._inesperado(error)}, 502)
 
     def _guardar_par(self, lamina):
         try:
