@@ -172,8 +172,6 @@ class Fuentes(unittest.TestCase):
             config = root / "config.json"
             with (
                 patch.object(p, "LOG_FILE", root / "proxy.log"),
-                patch.object(p, "writer_put", side_effect=AssertionError("No remote writes")),
-                patch.object(p, "work3_url", side_effect=AssertionError("No fallback")),
                 servidor(p.Handler, source, config) as (srv, base),
             ):
                 headers = {"Content-Type": "application/json", "X-Visor-Origen": source.id}

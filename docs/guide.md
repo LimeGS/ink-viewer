@@ -194,7 +194,7 @@ Keep the Spanish field and flag names shown here; they are the current CLI/API n
 | `--port` | `S3CACHE_PORT` | Loopback HTTP port; default `8797` |
 | `--scroll` | `SCROLL` | Default scroll selection |
 
-An explicit `--origen` selects a source at startup instead of loading the saved source. To resume the dialog's saved selection, start with `--config` alone and no `VISOR_ORIGEN` override. `--dry-run` prints resolved settings without starting HTTP or checking remote connectivity; do not confuse it with a successful data read.
+With no `--origen` and no saved settings, the viewer opens with an empty list and the **Change source** dialog; data requests answer 503 until a source is chosen. An explicit `--origen` selects a source at startup instead of loading the saved source. To resume the dialog's saved selection, start with `--config` alone and no `VISOR_ORIGEN` override. `--dry-run` prints resolved settings without starting HTTP or checking remote connectivity; do not confuse it with a successful data read.
 
 ## Deploy on your own server
 

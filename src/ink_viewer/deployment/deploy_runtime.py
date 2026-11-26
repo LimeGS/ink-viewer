@@ -30,27 +30,12 @@ def handler_for(proxy, deployment, preview=False):
                 return True
             return super()._codigo(head)
 
-        def _origen_info(self):
-            info = super()._origen_info()
-            if preview and info["tipo"] == "legacy":
-                info["escritura"] = False
-            return info
-
         def _cambiar_origen(self):
             if preview:
                 return self._json(
                     {"error": "Preview source is fixed; production configuration is unchanged"}, 403
                 )
             return super()._cambiar_origen()
-
-        def do_POST(self):
-            if (
-                preview
-                and not getattr(self.server, "fuente", None)
-                and urlsplit(self.path).path != "/api/origen"
-            ):
-                return self._json({"error": "Legacy preview is read-only"}, 403)
-            return super().do_POST()
 
     return DeploymentHandler
 
@@ -73,18 +58,15 @@ def serve(site, channel, nonce):
     runtime.mkdir(parents=True, exist_ok=True)
     preview = channel == "preview"
     config_path = site / "origin.json"
-    source = None
-    if settings["mode"] == "source":
-        config = json.loads(config_path.read_text())
-        if preview:
-            annotations = runtime / "annotations"
-            annotations.mkdir(exist_ok=True)
-            config["anotaciones"] = str(annotations)
-            config_path = runtime / "origin.json"
-        source = Fuente(**config)
-        source.verificar()
-    proxy.configurar(settings.get("scroll"), settings.get("legacy_root"), source)
-    proxy.CACHE = Path(settings.get("cache") or runtime / "cache")
+    config = json.loads(config_path.read_text())
+    if preview:
+        annotations = runtime / "annotations"
+        annotations.mkdir(exist_ok=True)
+        config["anotaciones"] = str(annotations)
+        config_path = runtime / "origin.json"
+    source = Fuente(**config)
+    source.verificar()
+    proxy.configurar(settings.get("scroll"), source)
     proxy.LOG_FILE = runtime / "visor.log"
     port = settings["preview_port"] if preview else settings["port"]
     deployment = {
@@ -93,15 +75,9 @@ def serve(site, channel, nonce):
         "site": settings["name"],
         "nonce": nonce,
         "port": port,
-        "origin": source.origen if source else str(proxy.ROOT),
+        "origin": source.origen,
         "preview": preview,
     }
-    if preview:
-
-        def no_external_write(*args, **kwargs):
-            raise PermissionError("Preview cannot write to the production catalog")
-
-        proxy.writer_put = proxy.s3_once = no_external_write
     srv = proxy.ThreadingHTTPServer(("127.0.0.1", port), handler_for(proxy, deployment, preview))
     srv.fuente, srv.config_path = source, config_path
     srv.config_token, srv.config_lock = secrets.token_urlsafe(32), threading.Lock()

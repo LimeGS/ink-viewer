@@ -86,9 +86,7 @@ class Deployment(unittest.TestCase):
         values = dict(
             origin=str(data_root),
             source_config=None,
-            legacy_root=None,
             annotations=None,
-            pipeline=None,
             scroll=None,
             from_port=None,
             name="fixture",
@@ -232,9 +230,6 @@ class Deployment(unittest.TestCase):
             )
             with (
                 patch.object(proxy, "LOG_FILE", root / "log"),
-                patch.object(
-                    proxy, "writer_put", side_effect=AssertionError("No production writes")
-                ),
                 servidor(handler, source, root / "production-config.json") as (_, base),
             ):
 
@@ -292,12 +287,7 @@ class Deployment(unittest.TestCase):
                 '{"scroll":"PHercX","TABLA":{"local":[1,2]}}'
             )
             source = Fuente(tmp)
-            with (
-                patch.object(
-                    proxy, "work3_url", side_effect=AssertionError("No cross-machine fallback")
-                ),
-                servidor(proxy.Handler, source) as (_, base),
-            ):
+            with servidor(proxy.Handler, source) as (_, base):
                 with urllib.request.urlopen(base + "/all-gallery/compuertas.json") as response:
                     self.assertEqual(json.load(response)["laminas"]["local"]["fisico"], "PASS")
                 with urllib.request.urlopen(base + "/all-gallery/metadata.json") as response:
@@ -328,17 +318,10 @@ class Deployment(unittest.TestCase):
             imported = json.loads((root / "deploy/origin.json").read_text())
             self.assertEqual(imported["origen"], str(data.resolve()))
             self.assertEqual(imported["anotaciones"], str(annotations.resolve()))
-            self.assertEqual(
-                json.loads((root / "deploy/rollos/PHerc1447/rollo.json").read_text()), physical
-            )
-            settings = viewerctl.load_settings(root / "deploy")
-            with patch.dict("os.environ", {"TRAZADO_WORK": settings["env"]["TRAZADO_WORK"]}):
-                empty = Fuente(str(root / "deploy"))
-                self.assertEqual(proxy.cargar_rollo("PHerc1447", empty), physical)
-                self.assertEqual(
-                    proxy.cargar_rollo("PHerc0800", empty),
-                    {"scroll": "PHerc0800", "voxel_um": None},
-                )
+            self.assertEqual(viewerctl.load_settings(root / "deploy")["env"], {})
+            # Physical metadata stays with the source; the profile keeps no copy.
+            self.assertFalse((root / "deploy/rollos").exists())
+            self.assertEqual(proxy.cargar_rollo("PHerc1447", Fuente(imported["origen"])), physical)
             self.assertNotIn("token", imported)
 
 

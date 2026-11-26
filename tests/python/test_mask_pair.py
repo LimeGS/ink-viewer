@@ -260,25 +260,17 @@ class MaskPair(unittest.TestCase):
                 (resolved / "lam_supervision_mask.png").read_bytes(),
             )
 
-    def test_legacy_pair_writer_fails_closed_and_defaults_are_generic(self):
-        with (
-            servidor(p.Handler) as (_, base),
-            patch.object(p, "writer_put", side_effect=AssertionError("No partial remote writes")),
-        ):
+    def test_pair_save_without_source_is_refused(self):
+        with servidor(p.Handler) as (_, base):
             with self.assertRaises(urllib.error.HTTPError) as e:
                 self.pedir(
                     base + "/api/mascara-par/lam" + self.query,
                     self.payload(),
                     {"Content-Type": "application/json"},
                 )
-            self.assertEqual(e.exception.code, 501)
+            self.assertEqual(e.exception.code, 503)
             self.assertFalse(json.loads(self.pedir(base + "/api/origen")[2])["atomic_pair"])
-        with patch.object(p, "ROOT", self.data):
-            self.assertEqual(p.cargar_rollo("PHercX"), {"scroll": "PHercX", "voxel_um": None})
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertFalse(any(self.annotations.rglob("*.png")))
 
 
 class MaskDecoding(unittest.TestCase):
@@ -299,7 +291,6 @@ class MaskDecoding(unittest.TestCase):
         with patch.object(p, "MASK_PIXELS", 3), self.assertRaisesRegex(ValueError, "megapixel"):
             p.leer_mascara(png())
 
-    def test_rejects_non_s3_uri(self):
-        with self.assertRaisesRegex(ValueError, "s3://"):
-            p.partir_s3("https://bucket/key")
-        self.assertEqual(p.partir_s3("s3://bucket/a/b/"), ("bucket", "a/b"))
+
+if __name__ == "__main__":
+    unittest.main()
