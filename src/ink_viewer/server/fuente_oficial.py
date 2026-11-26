@@ -11,6 +11,7 @@ import contextlib
 import gzip
 import json
 import os
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -77,6 +78,11 @@ class FuenteOficial(Fuente):
             entries, report, previews = construir_oficial(json.loads(raw))
         except Exception as e:
             if manifest.is_file():
+                print(
+                    f"Official index refresh failed; using the cached index: {e}",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 self._cargar_previews()
                 return False
             raise ValueError(

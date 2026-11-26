@@ -158,6 +158,15 @@ def main():
     a = ap.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+(@[A-Za-z0-9_.-]+)?", a.host):
         ap.error("Invalid SSH host")
+    try:
+        publish(a)
+    except subprocess.CalledProcessError as e:
+        ap.exit(e.returncode or 1, f"{e.cmd[0]} failed with exit code {e.returncode}\n")
+    except (OSError, ValueError) as e:
+        ap.exit(1, f"{e}\n")
+
+
+def publish(a):
     repo = SOURCE_ROOT
     if not a.no_fetch:
         subprocess.run(["git", "-C", str(repo), "fetch", "origin"], check=True)

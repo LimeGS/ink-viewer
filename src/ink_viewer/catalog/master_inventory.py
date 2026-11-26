@@ -658,13 +658,6 @@ def display_asset(source, params, validate_pair):
     raise ValueError("Rol inexistente")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--catalog", required=True)
-    args = parser.parse_args()
-    print(dump(build(Path(args.catalog))))
-
-
 def native_info(source, params, preview=False):
     from PIL import Image
 
@@ -697,3 +690,19 @@ def native_info(source, params, preview=False):
         out = io.BytesIO()
         im.save(out, format="PNG")
         return out.getvalue()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Build the catalog inventory database (_viewer/master-inventory.sqlite)."
+    )
+    parser.add_argument("--catalog", required=True, help="the catalog folder of a local source")
+    args = parser.parse_args(argv)
+    try:
+        print(dump(build(Path(args.catalog))))
+    except (OSError, ValueError, sqlite3.Error) as e:
+        parser.error(str(e))
+
+
+if __name__ == "__main__":
+    main()

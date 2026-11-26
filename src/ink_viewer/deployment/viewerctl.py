@@ -269,8 +269,8 @@ def start(site, channel):
                     dict(pid=process.pid, port=port, nonce=nonce, commit=version["commit"]),
                 )
                 return dict(info, url=f"http://127.0.0.1:{port}/all-gallery/index.html")
-        except Exception:
-            pass
+        except (OSError, ValueError):
+            pass  # not listening yet
         time.sleep(0.2)
     process.terminate()
     raise ValueError("Viewer did not become ready within 40 seconds")

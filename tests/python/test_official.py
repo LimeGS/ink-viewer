@@ -336,7 +336,12 @@ class OfficialSource(unittest.TestCase):
         self.assertTrue(source.preparar(force=True))
         self.assertEqual(source.indice("_viewer/manifest.json"), [])
         (self.bucket / "metadata.json").unlink()
-        self.assertFalse(source.preparar(force=True), "a failed refresh keeps the previous index")
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            self.assertFalse(
+                source.preparar(force=True), "a failed refresh keeps the previous index"
+            )
+        self.assertIn("using the cached index", stderr.getvalue())
         self.assertEqual(source.indice("_viewer/manifest.json"), [])
         fresh = Fuente("official")
         fresh.cache = Path(self.tmp.name) / "empty"
