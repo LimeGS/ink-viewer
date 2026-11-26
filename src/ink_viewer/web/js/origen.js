@@ -37,7 +37,7 @@
   'No es una cabecera PNG':'Not a PNG header'
  };
  window.visorTexto=t=>{let text=String(t||'');for(const [from,to] of Object.entries(errors))text=text.replaceAll(from,to);
-  return text.replace(/Indice mayor a (\d+) MiB/g,'Index exceeds $1 MiB').replaceAll('work-3',cfg&&cfg.tipo!=='legacy'?'local annotations':'work-3')};
+  return text.replace(/Indice mayor a (\d+) MiB/g,'Index exceeds $1 MiB')};
  window.visorPuedeGuardar=!cfg||cfg.escritura;
  if(!cfg)return;
  const originalFetch=window.fetch.bind(window);
@@ -55,7 +55,7 @@
    '#origenForm .check{display:flex;align-items:center;gap:8px}#origenForm input[type=checkbox]{width:16px;height:16px;accent-color:#60d4c6}#origenS3{display:grid;gap:14px}#origenS3[hidden]{display:none}'+
    '#origenAcciones{display:flex;justify-content:flex-end;gap:8px}#origenError{color:#ffb4ac;overflow-wrap:anywhere;min-height:18px;margin:0}'+
    '@media(max-width:700px){#origenActual{max-width:160px;margin-left:0}#origenDialog{padding:16px}}';document.head.append(style);
-  const current=document.createElement('span');current.id='origenActual';current.className='muted';current.textContent=(cfg.tipo==='legacy'?'Legacy':cfg.tipo.toUpperCase())+' · '+cfg.origen;current.title=cfg.origen+(cfg.escritura?" · annotations enabled":" · read-only");
+  const current=document.createElement('span');current.id='origenActual';current.className='muted';current.textContent=cfg.tipo==='none'?'No source':cfg.tipo.toUpperCase()+' · '+cfg.origen;current.title=cfg.origen+(cfg.escritura?" · annotations enabled":" · read-only");
   const button=document.createElement('button');button.id='origenAbrir';button.textContent="Change source";button.title="Configure data source";document.querySelector('header').append(current,button);
   const dialog=document.createElement('dialog');dialog.id='origenDialog';dialog.setAttribute('aria-labelledby','origenTitulo');
   dialog.innerHTML="<h2 id=\"origenTitulo\">Data source</h2><form id=\"origenForm\">"+
@@ -70,7 +70,7 @@
   function tipo(){const t=el('origenTipo').value;el('origenS3').hidden=t!=='s3';el('origenEtiqueta').textContent=t==='local'?'Carpeta':t==='s3'?"Bucket and prefix":"Base URL";el('origenRuta').placeholder=t==='local'?'/ruta/datos':t==='s3'?'s3://bucket/prefijo':'https://servidor/datos'}
   el('origenTipo').onchange=tipo;
   el('origenGuardar').onchange=()=>{el('origenAnotaciones').disabled=!el('origenGuardar').checked;el('origenAnotaciones').required=el('origenGuardar').checked};
-  button.onclick=()=>{el('origenTipo').value=cfg.tipo==='legacy'?'local':cfg.tipo;el('origenRuta').value=cfg.origen;el('origenPerfil').value=cfg.perfil||'';el('origenEndpoint').value=cfg.endpoint||'';el('origenRegion').value=cfg.region||'';el('origenAnotaciones').value=cfg.anotaciones||'';el('origenGuardar').checked=!!cfg.anotaciones;el('origenGuardar').onchange();el('origenError').textContent='';tipo();dialog.showModal()};
+  button.onclick=()=>{el('origenTipo').value=cfg.tipo==='none'?'local':cfg.tipo;el('origenRuta').value=cfg.origen;el('origenPerfil').value=cfg.perfil||'';el('origenEndpoint').value=cfg.endpoint||'';el('origenRegion').value=cfg.region||'';el('origenAnotaciones').value=cfg.anotaciones||'';el('origenGuardar').checked=!!cfg.anotaciones;el('origenGuardar').onchange();el('origenError').textContent='';tipo();dialog.showModal()};
   el('origenCancelar').onclick=()=>dialog.close();
   el('origenForm').onsubmit=async event=>{
    event.preventDefault();const apply=el('origenAplicar');apply.disabled=true;el('origenError').textContent="Validating source...";

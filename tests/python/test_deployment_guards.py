@@ -30,6 +30,8 @@ class DeploymentGuards(unittest.TestCase):
         for update in (
             {"schema": "unknown"},
             {"env": {"UNSUPPORTED": "x"}},
+            {"env": {"S3CACHE_WORK3_BASE": "http://lan.invalid"}},
+            {"mode": "legacy"},
             {"preview_port": 18101},
         ):
             file.write_text(json.dumps(dict(self.settings, **update)))
@@ -39,9 +41,7 @@ class DeploymentGuards(unittest.TestCase):
         args = argparse.Namespace(
             origin=None,
             source_config=str(self.root / "origin.json"),
-            legacy_root=None,
             annotations=None,
-            pipeline=str(self.root / "pipeline"),
             scroll="PHercA",
             from_port=None,
             name="fixture",
@@ -63,14 +63,7 @@ class DeploymentGuards(unittest.TestCase):
         with self.assertRaises(ValueError):
             viewerctl.init_site(other, args)
         args.from_port = None
-        args.origin = None
-        args.legacy_root = str(self.data)
         args.preview_port = args.port
-        with self.assertRaises(ValueError):
-            viewerctl.init_site(other, args)
-        args.preview_port = 18102
-        args.legacy_root = str(self.root / "file")
-        Path(args.legacy_root).write_text("not a directory")
         with self.assertRaises(ValueError):
             viewerctl.init_site(other, args)
 
@@ -107,4 +100,3 @@ class DeploymentGuards(unittest.TestCase):
                 viewerctl.stop(self.site, "preview")
         file.unlink()
         viewerctl.stop(self.site, "preview")
-

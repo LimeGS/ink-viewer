@@ -22,15 +22,6 @@ from pathlib import Path
 from ink_viewer.paths import LEGACY_RELEASE_FILES, RELEASE_FILES, SOURCE_ROOT
 
 ENV_NAMES = {
-    "PIPELINE",
-    "TRAZADO_WORK",
-    "S3CACHE_WORK3_BASE",
-    "S3CACHE_WORK3_TIMEOUT",
-    "S3CACHE_PROFILE",
-    "S3CACHE_BUCKET",
-    "CATALOG_WRITER_TOKEN",
-    "ARCHIVO_S3",
-    "CAMPANA_S3",
     "AWS_PROFILE",
     "AWS_CONFIG_FILE",
     "AWS_SHARED_CREDENTIALS_FILE",
@@ -51,8 +42,15 @@ def load_settings(site):
     settings = json.loads((site / "site.json").read_text())
     if settings.get("schema") != SCHEMA or settings.get("mode") not in ("source", "legacy"):
         raise ValueError("Invalid deployment profile")
-    if set(settings.get("env", {})) - ENV_NAMES:
-        raise ValueError("Unsupported deployment environment variable")
+    if settings["mode"] == "legacy":
+        raise ValueError(
+            "This profile uses the removed legacy docroot mode: run init again with --origin"
+        )
+    unsupported = set(settings.get("env", {})) - ENV_NAMES
+    if unsupported:
+        raise ValueError(
+            "Unsupported deployment environment variable: " + ", ".join(sorted(unsupported))
+        )
     if settings["port"] == settings["preview_port"]:
         raise ValueError("Production and preview ports must differ")
     return settings
@@ -64,58 +62,35 @@ def init_site(site, args):
         raise ValueError("Deployment state must be outside the Git checkout")
     if (site / "site.json").exists() or (site / "origin.json").exists():
         raise ValueError("Profile already exists; init never overwrites machine configuration")
-    imported_rollos = {}
     if args.from_port:
-        if args.origin or args.source_config or args.legacy_root:
+        if args.origin or args.source_config:
             raise ValueError("--from-port cannot be combined with another source option")
         with urllib.request.urlopen(
             f"http://127.0.0.1:{args.from_port}/api/origen", timeout=5
         ) as response:
             running = json.load(response)
-        if running["tipo"] == "legacy":
-            args.legacy_root = running["origen"]
-        else:
-            imported_source = {
-                k: running.get(k, "")
-                for k in ("origen", "perfil", "endpoint", "region", "anotaciones")
-            }
-        for scroll in ("PHerc1447", "PHerc0800", "PHerc0306B", "PHerc1218", "PHerc0175A"):
-            try:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{args.from_port}/api/rollo.js?rollo={scroll}", timeout=5
-                ) as response:
-                    data = json.loads(
-                        response.read()
-                        .decode()
-                        .removeprefix("window.ROLLO_SERVIDOR=")
-                        .rstrip(";\n")
-                    )
-                    if data.get("scroll") == scroll and float(data.get("voxel_um") or 0) > 0:
-                        imported_rollos[scroll] = {k: v for k, v in data.items() if k != "proxy"}
-            except (urllib.error.HTTPError, ValueError):
-                pass
-    env = {k: os.environ[k] for k in ENV_NAMES if k in os.environ}
-    if args.pipeline:
-        env["PIPELINE"] = str(Path(args.pipeline).expanduser().resolve())
-    mode = "legacy" if args.legacy_root else "source"
-    source = None
-    if mode == "source":
+        if not running.get("origen"):
+            raise ValueError("The running viewer has no source to import")
+        source = {
+            k: running.get(k, "") for k in ("origen", "perfil", "endpoint", "region", "anotaciones")
+        }
+    else:
         config = (
             Path(args.source_config).expanduser()
             if args.source_config
             else Path.home() / ".config/vesuvius-visor/config.json"
         )
-        if args.from_port:
-            source = imported_source
-        elif args.origin:
+        if args.origin:
             source = dict(origen=args.origin, anotaciones=args.annotations or "")
         elif config.is_file():
             source = json.loads(config.read_text())
         else:
-            raise ValueError("Provide --origin, --source-config, or --legacy-root for this machine")
-        from ink_viewer.server.fuentes import Fuente
+            raise ValueError("Provide --origin or --source-config for this machine")
+    from ink_viewer.server.fuentes import Fuente
 
-        source = Fuente(**source).config()
+    source = Fuente(**source).config()
+    env = {k: os.environ[k] for k in ENV_NAMES if k in os.environ}
+    mode = "source"
     settings = dict(
         schema=SCHEMA,
         name=args.name or socket.gethostname(),
@@ -125,24 +100,14 @@ def init_site(site, args):
         python=str(Path(sys.executable).absolute()),
         env=env,
     )
-    if args.legacy_root:
-        root = Path(args.legacy_root).expanduser().resolve(strict=True)
-        if not root.is_dir():
-            raise ValueError("Legacy docroot must be a directory")
-        settings["legacy_root"], settings["cache"] = str(root), str(root / ".s3cache")
     if args.scroll:
         settings["scroll"] = args.scroll
-    if imported_rollos:
-        settings["env"]["TRAZADO_WORK"] = str(site / "rollos")
     if settings["port"] == settings["preview_port"] or not all(
         0 < p < 65536 for p in (settings["port"], settings["preview_port"])
     ):
         raise ValueError("Choose two different valid ports")
     site.mkdir(parents=True, exist_ok=True)
-    for scroll, data in imported_rollos.items():
-        save(site / "rollos" / scroll / "rollo.json", data)
-    if source is not None:
-        save(site / "origin.json", source)
+    save(site / "origin.json", source)
     save(site / "site.json", settings)
     return {
         "site": str(site),
@@ -351,9 +316,7 @@ def main():
         "name",
         "origin",
         "source-config",
-        "legacy-root",
         "annotations",
-        "pipeline",
         "scroll",
     ):
         init.add_argument("--" + flag)

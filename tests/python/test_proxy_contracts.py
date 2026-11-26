@@ -1,11 +1,10 @@
-"""Failure and cache contracts for legacy adapters; external calls are stand-ins."""
+"""Failure and cache contracts of the proxy helpers; external calls are stand-ins."""
 
 import contextlib
 import io
 import json
 import tempfile
 import unittest
-import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -20,131 +19,36 @@ class ProxyContracts(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
         self.addCleanup(patch.stopall)
-        for name in (
-            "ROOT",
-            "LOG_FILE",
-            "WORK3_BASE",
-            "TOKEN_FILE",
-            "PERFIL",
-            "_s3",
-            "_pending",
-            "PENDING_MAX",
-        ):
-            patch.object(proxy, name, getattr(proxy, name)).start()
-        proxy.ROOT = self.root
-        proxy.LOG_FILE = self.root / "log"
-        proxy._pending = {}
+        patch.object(proxy, "LOG_FILE", self.root / "log").start()
 
-    def test_physical_metadata_fallbacks_and_invalid_values(self):
+    def test_physical_metadata_comes_from_the_source(self):
         with self.assertRaises(ValueError):
             proxy.cargar_rollo("../outside")
         (self.root / "rollos").mkdir()
+        source = Fuente(str(self.root))
         f = self.root / "rollos/PHercA.json"
         f.write_text('{"scroll":"PHercA","voxel_um":7.91}')
-        self.assertEqual(proxy.cargar_rollo("PHercA")["voxel_um"], 7.91)
+        self.assertEqual(proxy.cargar_rollo("PHercA", source)["voxel_um"], 7.91)
         f.write_text('{"scroll":"PHercB","voxel_um":7.91}')
         with self.assertRaises(ValueError):
-            proxy.cargar_rollo("PHercA")
+            proxy.cargar_rollo("PHercA", source)
         f.unlink()
-        external = self.root / "imported"
-        (external / "PHercA").mkdir(parents=True)
-        meta = external / "PHercA/rollo.json"
-        meta.write_text('{"scroll":"PHercA","voxel_um":8.64}')
-        with patch.dict(
-            proxy.os.environ, {"TRAZADO_WORK": str(external), "PIPELINE": str(self.root)}
-        ):
-            self.assertEqual(proxy.cargar_rollo("PHercA")["voxel_um"], 8.64)
-            meta.write_text('{"scroll":"other","voxel_um":8.64}')
-            with self.assertRaises(ValueError):
-                proxy.cargar_rollo("PHercA")
-            meta.unlink()
-            f.write_text('{"scroll":"PHercA","voxel_um":9.1}')
-            self.assertEqual(proxy.cargar_rollo("PHercA")["voxel_um"], 9.1)
-        proxy.ROOT = self.root / "empty"
-        with patch.dict(proxy.os.environ, {"TRAZADO_WORK": "", "PIPELINE": str(self.root)}):
-            self.assertEqual(proxy.cargar_rollo("PHercA")["voxel_um"], 9.1)
-            f.write_text('{"scroll":"other","voxel_um":9.1}')
-            self.assertIsNone(proxy.cargar_rollo("PHercA")["voxel_um"])
+        (self.root / "rollos/PHercA").mkdir()
+        (self.root / "rollos/PHercA/rollo.json").write_text('{"scroll":"PHercA","voxel_um":0}')
+        with self.assertRaises(ValueError):
+            proxy.cargar_rollo("PHercA", source)
+        # Unknown stays unknown: no source or no metadata never guesses a scale.
+        self.assertIsNone(proxy.cargar_rollo("PHercC", source)["voxel_um"])
+        self.assertIsNone(proxy.cargar_rollo("PHercA")["voxel_um"])
 
-    def test_signed_client_is_lazy_and_reused(self):
-        with patch("boto3.Session") as session:
-            proxy._s3 = None
-            proxy.PERFIL = "fixture-profile"
-            first = proxy.s3()
-            self.assertIs(proxy.s3(), first)
-            session.assert_called_once_with(profile_name="fixture-profile")
-            proxy._s3 = None
-            proxy.PERFIL = ""
-            proxy.s3()
-            self.assertEqual(session.call_args.kwargs, {})
-
-    def test_writer_errors_preserve_status_and_deferred_uploads_are_bounded(self):
-        proxy.WORK3_BASE = ""
-        proxy.TOKEN_FILE = None
-        with self.assertRaises(PermissionError):
-            proxy.writer_put("x", b"x")
-        proxy.WORK3_BASE = "http://fixture.invalid"
-        proxy.TOKEN_FILE = self.root / "token"
-        proxy.TOKEN_FILE.write_text("test-only")
-        error = urllib.error.HTTPError(
-            "http://fixture.invalid", 409, "conflict", {}, io.BytesIO(b'{"error":"conflict"}')
-        )
-        with patch.object(proxy.urllib.request, "urlopen", side_effect=error):
-            self.assertEqual(proxy.writer_put("x", b"x"), (409, {"error": "conflict"}))
-        for status in (404, 500):
-            error = urllib.error.HTTPError(
-                "http://fixture.invalid", status, "failure", {}, io.BytesIO()
-            )
-            with (
-                patch.object(proxy.urllib.request, "urlopen", side_effect=error),
-                patch.object(proxy, "s3") as client,
-                patch.object(proxy, "writer_put", return_value=(503, {"error": "offline"})),
-                patch.object(proxy, "log"),
-            ):
-                client.return_value.get_object.return_value = {"Body": io.BytesIO(b"pixels")}
-                if status == 500:
-                    with self.assertRaises(urllib.error.HTTPError):
-                        proxy.s3_once("catalog/a.png", "a")
-                else:
-                    self.assertEqual(proxy.s3_once("catalog/a.png", "a"), b"pixels")
-                    self.assertEqual(proxy._pending["catalog/a.png"], b"pixels")
-                    proxy.PENDING_MAX = 0
-                    self.assertEqual(proxy.s3_once("catalog/a.png", "a"), b"pixels")
-                    self.assertFalse(proxy._pending)
-                    self.assertEqual(client.return_value.get_object.call_count, 1)
-        for value in ("/absolute", "../escape"):
-            with self.assertRaises(ValueError):
-                proxy.catalog_url({"path": value})
-
-    def test_stream_failures_and_optional_missing_do_not_hide_errors(self):
-        handler = object.__new__(proxy.Handler)
-        handler.headers = {}
-        handler.wfile = io.BytesIO()
-        handler.send_error = MagicMock()
-        handler.send_response = MagicMock()
-        handler.send_header = MagicMock()
-        handler.end_headers = MagicMock()
-        for status in (404, 500):
-            error = urllib.error.HTTPError(
-                "http://fixture.invalid", status, "failure", {}, io.BytesIO()
-            )
-            with patch.object(proxy.urllib.request, "urlopen", side_effect=error):
-                result = handler._stream("http://fixture.invalid", missing_ok=True)
-                if status == 404:
-                    self.assertEqual(result, 404)
-                else:
-                    handler.send_error.assert_called_with(500, None)
-        with (
-            patch.object(proxy.urllib.request, "urlopen", side_effect=OSError("offline")),
-            patch.object(proxy, "log"),
-        ):
-            handler._stream("http://fixture.invalid")
-            handler.send_error.assert_called_with(502, "work-3 no responde")
+    def test_manifest_and_gzip_negotiation_reject_bad_input(self):
         source = MagicMock()
         source.indice.return_value = {}
         with self.assertRaises(ValueError):
             proxy.manifest_bytes.__wrapped__(source, None)
         self.assertFalse(proxy.accepts_gzip("gzip;q=invalid"))
+        self.assertFalse(proxy.accepts_gzip("gzip;q=0"))
+        self.assertTrue(proxy.accepts_gzip("br, gzip"))
 
     def test_input_validation_atomic_json_and_mask_history(self):
         for value in (

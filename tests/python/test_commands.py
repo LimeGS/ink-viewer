@@ -25,18 +25,7 @@ class Commands(unittest.TestCase):
         (self.data / "all-gallery").mkdir()
         (self.data / "all-gallery/manifest.json").write_text("[]")
         self.addCleanup(patch.stopall)
-        for name in (
-            "ROOT",
-            "CACHE",
-            "LOG_FILE",
-            "SCROLL",
-            "ROLLO",
-            "ESPEJO",
-            "LABELS_UNKNOWN",
-            "PORT",
-            "writer_put",
-            "s3_once",
-        ):
+        for name in ("LOG_FILE", "SCROLL", "ROLLO", "PORT"):
             patch.object(proxy, name, getattr(proxy, name)).start()
 
     def invoke(self, module, args):
@@ -45,7 +34,7 @@ class Commands(unittest.TestCase):
             module.main()
         return output.getvalue()
 
-    def test_server_cli_source_config_legacy_and_validation(self):
+    def test_server_cli_source_config_and_validation(self):
         cfg = self.root / "settings/source.json"
         flags = ["--config", str(cfg), "--origen", str(self.data)]
         info = json.loads(self.invoke(proxy, [*flags, "--dry-run"]))
@@ -67,12 +56,16 @@ class Commands(unittest.TestCase):
             self.assertEqual(factory.call_args.args[0][0], "127.0.0.1")
             self.assertTrue(factory.return_value.fuente)
             cfg.unlink()
-            self.invoke(proxy, ["--config", str(cfg), "--raiz", str(self.data)])
-        info = json.loads(
-            self.invoke(proxy, ["--config", str(cfg), "--raiz", str(self.data), "--dry-run"])
-        )
-        self.assertEqual(info["raiz"], str(self.data))
-        for args in ([*flags, "--raiz", str(self.data)], [*flags, "--s3-endpoint", "invalid"]):
+            # No source and no saved config: the page opens with the source picker.
+            self.invoke(proxy, ["--config", str(cfg)])
+            self.assertIsNone(factory.return_value.fuente)
+        info = json.loads(self.invoke(proxy, ["--config", str(cfg), "--dry-run"]))
+        self.assertIsNone(info["scroll"])
+        for args in (
+            [*flags, "--raiz", str(self.data)],
+            [*flags, "--s3-endpoint", "invalid"],
+            [*flags, "--scroll", "../x"],
+        ):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 self.invoke(proxy, args)
         english = json.loads(
@@ -202,14 +195,11 @@ class Commands(unittest.TestCase):
             self.assertEqual(factory.call_args.args[0], ("127.0.0.1", 18102))
             self.assertEqual(factory.return_value.config_path, site / "state/preview/origin.json")
             self.assertTrue(factory.return_value.fuente.anotaciones.endswith("preview/annotations"))
-            with self.assertRaises(PermissionError):
-                proxy.writer_put("x", b"x")
             factory.return_value.server_close.assert_called_once()
-            settings["mode"] = "legacy"
-            settings["env"] = {"PIPELINE": "fixture"}
+            settings["env"] = {"AWS_PROFILE": "fixture"}
             with patch.dict(os.environ, {}, clear=False):
                 deploy_runtime.serve(site, "preview", "nonce")
-            self.assertIsNone(factory.return_value.fuente)
+                self.assertEqual(os.environ["AWS_PROFILE"], "fixture")
         with (
             patch.object(viewerctl, "load_settings", return_value=settings),
             patch.object(deploy_runtime, "SOURCE_ROOT", self.root / "other"),
@@ -262,4 +252,3 @@ class Commands(unittest.TestCase):
             )
         with self.assertRaises(ValueError):
             publish_preview.code_bundle(self.root, "invalid", self.root / "bad.bundle")
-

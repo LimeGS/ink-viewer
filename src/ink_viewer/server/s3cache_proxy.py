@@ -5,10 +5,6 @@ Use --origen CARPETA|https://servidor/prefijo|s3://bucket/prefijo and optionally
 --anotaciones CARPETA for validated annotation pairs. Source metadata is read from
 rollos/<sample>/rollo.json or rollos/<sample>.json; unknown measurements stay unknown.
 /api/origen can select and persist a source in --config. No image data is bundled.
-
-Legacy catalog streaming is opt-in through S3CACHE_WORK3_BASE, ARCHIVO_S3,
-CAMPANA_S3, S3CACHE_BUCKET/S3CACHE_PROFILE and CATALOG_WRITER_TOKEN. Its external
-writer does not support atomic annotation pairs; configure local annotations.
 """
 
 import argparse
@@ -22,7 +18,6 @@ import math
 import os
 import re
 import secrets
-import shutil
 import struct
 import tempfile
 import threading
@@ -32,7 +27,7 @@ import urllib.request
 from functools import lru_cache
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.canonical_masks as canonical
@@ -55,8 +50,6 @@ class MapTooLarge(ValueError):
     pass
 
 
-# Dataset state is independent of the installed Python package and static assets.
-ROOT = Path.cwd().resolve()
 CODE = WEB_ROOT
 STATIC = {
     str(path.relative_to(CODE))
@@ -81,51 +74,26 @@ VIEWER_TOOLS = (
     "corte.js",
     "recorte.js",
 )
-CACHE = ROOT / ".s3cache"
-LOG_FILE = ROOT / "s3cache_proxy.log"
-# buckets privados (GENERALIZAR.md regla 3): URIs completas sin barra final
-ARCHIVO_S3 = os.environ.get("ARCHIVO_S3", "")
-CAMPANA_S3 = os.environ.get("CAMPANA_S3", "")
+LOG_FILE = None  # set by main() next to the --config file
 
 
-def partir_s3(uri):
-    """s3://bucket/clave -> (bucket, clave sin barras en los bordes)."""
-    if not uri.startswith("s3://"):
-        raise ValueError(f"no es una URI s3://: {uri}")
-    bucket, _, clave = uri[len("s3://") :].partition("/")
-    return bucket, clave.strip("/")
-
-
-BUCKET = os.environ.get("S3CACHE_BUCKET") or (partir_s3(ARCHIVO_S3)[0] if ARCHIVO_S3 else "")
-PERFIL = os.environ.get("S3CACHE_PROFILE", "")
-# work-3 (nginx, LAN): lectura de solo lectura; escritura solo con token (catalog_writer)
-WORK3_BASE = os.environ.get("S3CACHE_WORK3_BASE", "")
-WORK3_TIMEOUT = float(os.environ.get("S3CACHE_WORK3_TIMEOUT", 30))
-TOKEN_FILE = (
-    Path(os.environ["CATALOG_WRITER_TOKEN"]).expanduser()
-    if os.environ.get("CATALOG_WRITER_TOKEN")
-    else None
-)
 # Optional metadata for paths without an explicit sample.
 SCROLL = ROLLO = None
-ESPEJO = None  # espejo nginx de all-gallery-backing en work-3: <clave de CAMPANA_S3>/<rollo>/all-gallery-backing/
-LABELS_UNKNOWN = None  # base de etiquetas de una lamina sin segmento conocido: _unresolved/<rollo>
 PORT = int(os.environ.get("S3CACHE_PORT", 8797))
 # Listen address; keep loopback by default. The Docker image sets 0.0.0.0 and the
 # host should publish the port on 127.0.0.1 only (writes are loopback-gated).
 BIND = os.environ.get("S3CACHE_BIND", "127.0.0.1")
 TYPES = {".png": "image/png", ".jpg": "image/jpeg"}
-
-
-def espejo_de(sample):
-    """espejo nginx de all-gallery-backing en work-3 para un sample: <clave de CAMPANA_S3>/<sample>/all-gallery-backing/."""
-    prefix = partir_s3(CAMPANA_S3)[1] if CAMPANA_S3 else ""
-    return "/".join(filter(None, (prefix, sample, "all-gallery-backing"))) + "/"
+NO_SOURCE = "No data source: start with --source or choose one with Change source"
+# Optional manifests the page always requests; they are empty unless a source provides them.
+OPTIONAL_MANIFESTS = (
+    "catalog/_viewer/manifest-work3.js",
+    "all-gallery/derived-c019/manifest-c019-local.js",
+)
 
 
 def sample_de(rel):
-    """Sample de un path de visor: catalog/<sample>/... o catalog/_unresolved/<sample>/...; None si el path no lo trae
-    (rutas legacy de la galeria, que van al sample del docroot)."""
+    """Sample of a viewer path: catalog/<sample>/... or catalog/_unresolved/<sample>/...; None otherwise."""
     m = re.match(r"(?:\.\./)?catalog/_unresolved/([^/]+)/", rel)
     if m:
         return m.group(1)
@@ -133,40 +101,16 @@ def sample_de(rel):
     return m.group(1) if m and m.group(1) != "segments" else None
 
 
-def sample_default():
-    """Sample explicitly selected for legacy paths; otherwise unknown."""
-    return SCROLL or "unknown"
-
-
 def cargar_rollo(scroll, fuente=None):
     """Physical metadata belongs to the selected dataset; no parent checkout is required."""
     if not re.fullmatch(r"PHerc[0-9A-Za-z]+", scroll or ""):
         raise ValueError("Identificador de rollo invalido")
     for rel in (f"rollos/{scroll}/rollo.json", f"rollos/{scroll}.json"):
-        if fuente:
-            info = fuente.indice(rel)
-        else:
-            path = ROOT / rel
-            info = json.loads(path.read_text()) if path.is_file() else {}
+        info = fuente.indice(rel) if fuente else {}
         if info:
             if info.get("scroll") != scroll or not float(info.get("voxel_um", 0)) > 0:
                 raise ValueError("Metadatos fisicos del rollo invalidos")
             return info
-    # Deployment profiles may retain explicit metadata imported from a running viewer.
-    if os.environ.get("TRAZADO_WORK"):
-        path = Path(os.environ["TRAZADO_WORK"]) / scroll / "rollo.json"
-        if path.is_file():
-            info = json.loads(path.read_text())
-            if info.get("scroll") != scroll or not float(info.get("voxel_um") or 0) > 0:
-                raise ValueError("Metadatos fisicos del rollo invalidos")
-            return info
-    # Existing installations may explicitly select their pipeline metadata directory.
-    if os.environ.get("PIPELINE"):
-        path = Path(os.environ["PIPELINE"]) / "rollos" / f"{scroll}.json"
-        if path.is_file():
-            info = json.loads(path.read_text())
-            if info.get("scroll") == scroll and float(info.get("voxel_um", 0)) > 0:
-                return info
     return {"scroll": scroll, "voxel_um": None}
 
 
@@ -354,175 +298,32 @@ def ubicacion_par(lamina, base, depth, propuesta=False, recorte=None):
     )
 
 
-def configurar(scroll=None, raiz=None, fuente=None):
-    """Sin scroll: el proxy sirve TODOS los rollos del docroot (el sample sale del path). Con scroll: como antes."""
-    global SCROLL, ROLLO, ESPEJO, LABELS_UNKNOWN, ROOT, CACHE, LOG_FILE
-    if raiz:
-        ROOT = Path(raiz).resolve()
-        CACHE, LOG_FILE = ROOT / ".s3cache", ROOT / "s3cache_proxy.log"
-    if scroll:
-        ROLLO = cargar_rollo(scroll, fuente)
-        SCROLL = ROLLO["scroll"]
-        ESPEJO = espejo_de(SCROLL)
-        LABELS_UNKNOWN = f"_unresolved/{SCROLL}"
-    else:
-        ROLLO = SCROLL = ESPEJO = LABELS_UNKNOWN = None
+def configurar(scroll=None, fuente=None):
+    """Optionally pin a default scroll, used when a request names none."""
+    global SCROLL, ROLLO
+    ROLLO = cargar_rollo(scroll, fuente) if scroll else None
+    SCROLL = ROLLO["scroll"] if ROLLO else None
     return {
         "scroll": SCROLL,
         "voxel_um": (ROLLO or {}).get("voxel_um"),
         "paso_hoja_um": (ROLLO or {}).get("paso_hoja_um"),
-        "raiz": str(ROOT),
-        "log": str(LOG_FILE),
-        "bucket": BUCKET,
-        "perfil": PERFIL,
-        "campana_s3": CAMPANA_S3,
-        "work3_base": WORK3_BASE,
-        "espejo_work3": ESPEJO,
-        "etiquetas_sin_segmento": LABELS_UNKNOWN,
-        "token_writer": str(TOKEN_FILE) if TOKEN_FILE else "",
-        "indices": {
-            n: (ROOT / n).exists()
-            for n in (
-                "catalog_asset_index.json",
-                "mac_cache_index.json",
-                "s3_on_demand_index.json",
-                "lamina_labels_index.json",
-                "propuestas.json",
-            )
-        },
+        "log": str(LOG_FILE) if LOG_FILE else "",
     }
-
-
-_locks, _guard = {}, threading.Lock()
-# files brought from S3 whose write to work-3 failed: kept in memory (bounded) and written again on the next request,
-# so a failure never costs a second S3 download
-_pending, PENDING_MAX = {}, 256 * 2**20
 
 
 def log(msg):
     line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
     print(line, flush=True)
-    with open(LOG_FILE, "a") as f:
-        f.write(line + "\n")
-
-
-_indexes = {}
-
-
-def index(name):
-    """A JSON index next to the proxy, reloaded when the file changes; {} if it does not exist."""
-    path = ROOT / name
-    stamp = path.stat().st_mtime_ns if path.exists() else None
-    # 25-sep: a file that never existed gave KeyError (None == the default stamp, so nothing was cached): every request
-    # outside the docroot crashed in the docroot of a new scroll, which has none of these indexes yet
-    if name not in _indexes or _indexes[name][1] != stamp:
-        _indexes[name] = (json.loads(path.read_text()) if stamp else {}, stamp)
-    return _indexes[name][0]
-
-
-def load_catalog_index():
-    return index("catalog_asset_index.json")
-
-
-def load_mac_index():
-    return index("mac_cache_index.json")  # ruta oficial -> copia en la Mac (D6)
-
-
-def load_s3_once_index():
-    return index("s3_on_demand_index.json")  # ruta oficial -> clave S3 (F5)
-
-
-def load_labels_index():
-    return index("lamina_labels_index.json")  # lamina del visor -> base en el catalogo (D4)
-
-
-_s3 = None
-
-
-def s3():
-    """Solo para bajar una vez a work-3 lo que falta (F5). Nunca para servir desde S3 sin dejarlo en work-3."""
-    global _s3
-    if _s3 is None:
-        import boto3
-        from botocore.config import Config
-
-        ses = boto3.Session(profile_name=PERFIL) if PERFIL else boto3.Session()
-        _s3 = ses.client("s3", config=Config(max_pool_connections=32, retries={"max_attempts": 2}))
-    return _s3
-
-
-def catalog_url(record):
-    path = record["path"]
-    if path.startswith("/") or ".." in Path(path).parts:
-        raise ValueError("Invalid catalog path")
-    return WORK3_BASE.rstrip("/") + "/viewer-catalog/" + quote(path, safe="/")
-
-
-def work3_url(rel):
-    """Where work-3 serves a viewer path: the official catalog layout, the catalog reader, or the gallery mirror."""
-    if rel.startswith(
-        "catalog/"
-    ):  # official layout: /mnt/ct/catalog/<sample>/segments/<segment>/... on work-3
-        return WORK3_BASE.rstrip("/") + "/" + quote(rel, safe="/")
-    record = load_catalog_index().get(rel)
-    espejo = espejo_de(sample_de(rel) or sample_default())
-    return (
-        catalog_url(record)
-        if record
-        else WORK3_BASE.rstrip("/") + "/" + quote(espejo + rel, safe="/")
-    )
-
-
-def writer_put(rel, body):
-    """PUT a file into the catalog on work-3 (catalog_writer); returns (status, json)."""
-    if not WORK3_BASE or TOKEN_FILE is None:
-        raise PermissionError(
-            "Configura S3CACHE_WORK3_BASE y CATALOG_WRITER_TOKEN para el escritor legacy"
-        )
-    req = urllib.request.Request(
-        WORK3_BASE.rstrip("/") + "/catalog-write/" + quote(rel, safe="/"),
-        data=body,
-        method="PUT",
-        headers={"X-Catalog-Token": TOKEN_FILE.read_text().strip()},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as r:
-            return r.status, json.loads(r.read() or b"{}")
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
-
-
-def s3_once(rel, key):
-    """Bring one official file from S3 to work-3 exactly once (concurrent requests wait for the first); returns bytes."""
-    with _guard:
-        lock = _locks.setdefault(rel, threading.Lock())
-    with lock:
-        try:  # another request may have just stored it
-            with urllib.request.urlopen(work3_url(rel), timeout=WORK3_TIMEOUT) as r:
-                return r.read()
-        except urllib.error.HTTPError as e:
-            if e.code != 404:
-                raise
-        body = _pending.get(rel)
-        if body is None:
-            body = s3().get_object(Bucket=BUCKET, Key=key)["Body"].read()
-        status, reply = writer_put(rel.removeprefix("catalog/"), body)
-        log(
-            f"S3 -> work-3 {rel} ({len(body) / 2**20:.2f} MiB): {status} {reply.get('status') or reply.get('error')}"
-        )
-        if status < 300:
-            _pending.pop(rel, None)
-        else:
-            _pending[rel] = body
-            while sum(map(len, _pending.values())) > PENDING_MAX:
-                _pending.pop(next(iter(_pending)))
-        return body
+    if LOG_FILE:
+        with open(LOG_FILE, "a") as f:
+            f.write(line + "\n")
 
 
 def labels_base(lamina, base=None, rollo=None, fuente=None):
-    """labels/ folder for a mask: the segment the viewer names (?base=<sample>/segments/<segment>, taken from the map's own
-    catalog path, 24-sep), else the lamina index (D4), else _unresolved/<rollo>. Multi-rollo: un indice de otro rollo se
-    ignora cuando el rollo es conocido, para que una lamina repetida entre rollos no aterrice en el segmento de otro."""
+    """labels/ folder for a mask: the segment the viewer names (?base=<sample>/segments/<segment>, taken from
+    the map's own catalog path), else the source's lamina index, else _unresolved/<rollo>. When the scroll is
+    known, an index entry of another scroll is ignored, so a lamina name shared by two scrolls never lands
+    in the other scroll's segment."""
     if base:
         if (
             not re.fullmatch(r"[A-Za-z0-9][\w.-]*/segments/[A-Za-z0-9][\w.-]*", base)
@@ -533,16 +334,12 @@ def labels_base(lamina, base=None, rollo=None, fuente=None):
             raise ValueError("La base pertenece a otro rollo")
         return base
     rollo = rollo or SCROLL or None
-    indexed = (fuente.indice("lamina_labels_index.json") if fuente else load_labels_index()).get(
-        lamina
-    )
+    indexed = fuente.indice("lamina_labels_index.json").get(lamina)
     if indexed:
-        dueno = sample_de(indexed) or indexed.split("/")[0]
-        if not rollo or dueno == rollo:
-            return (
-                indexed  # sin rollo conocido (docroot de un solo rollo) manda el indice, como antes
-            )
-    return f"_unresolved/{rollo or sample_default()}"
+        owner = sample_de(indexed) or indexed.split("/")[0]
+        if not rollo or owner == rollo:
+            return indexed
+    return f"_unresolved/{rollo or 'unknown'}"
 
 
 @lru_cache(maxsize=2)
@@ -601,62 +398,35 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def __init__(self, *a, **kw):
-        super().__init__(*a, directory=str(ROOT), **kw)
+        super().__init__(*a, directory=str(CODE), **kw)
 
     def log_message(self, fmt, *args):
-        pass  # el log propio (log()) ya cubre lo que importa; no duplicar el access log
+        pass  # log() records what matters; no per-request access log
 
     def do_HEAD(self):
         self.fuente = getattr(self.server, "fuente", None)
         if self._codigo(head=True):
             return
-        if self.fuente:
-            if not self._host_local():
-                return self.send_error(403)
-            return self._fuente_get(head=True)
-        path = unquote(urlsplit(self.path).path).lstrip("/")
-        if ".." in Path(path).parts or (ROOT / path).exists() or (CACHE / path).is_file():
-            return super().do_HEAD()
-        self._stream(work3_url(path), head=True)
+        if not self._host_local():
+            return self.send_error(403)
+        if not self.fuente:
+            return self._sin_origen(head=True)
+        return self._fuente_get(head=True)
 
-    def _stream(self, url, head=False, missing_ok=False):
-        """Relay work-3's answer as is (Range included) without keeping a copy on the Mac. With missing_ok a 404 is
-        returned to the caller instead of being sent, so it can fall back to S3 once."""
-        headers = {"Range": self.headers["Range"]} if self.headers.get("Range") else {}
-        try:
-            response = urllib.request.urlopen(
-                urllib.request.Request(url, headers=headers, method="HEAD" if head else "GET"),
-                timeout=WORK3_TIMEOUT,
+    def _sin_origen(self, head=False):
+        """No source yet: the page loads with an empty list and the source picker; data paths answer 503."""
+        path = unquote(urlsplit(self.path).path).lstrip("/")
+        if path == "all-gallery/manifest.js":
+            return self._send_bytes(
+                b"window.manifest=[];\n", "application/javascript", "none", head
             )
-        except urllib.error.HTTPError as e:
-            if missing_ok and e.code == 404:
-                return 404
-            return self.send_error(
-                e.code, "No esta en la Mac ni en work-3" if e.code == 404 else None
+        if path in OPTIONAL_MANIFESTS:
+            return self._send_bytes(
+                b"// No source configured.\n", "application/javascript", "none", head
             )
-        except Exception as e:
-            log(f"!! work-3 no responde ({url}): {str(e)[:120]}")
-            return self.send_error(502, "work-3 no responde")
-        with response:
-            try:
-                self.send_response(response.status)
-                for key in (
-                    "Content-Type",
-                    "Content-Length",
-                    "Content-Range",
-                    "Accept-Ranges",
-                    "Last-Modified",
-                    "ETag",
-                ):
-                    if response.headers.get(key):
-                        self.send_header(key, response.headers[key])
-                self.send_header("X-Fuente", "work-3")
-                self.end_headers()
-                if not head:
-                    shutil.copyfileobj(response, self.wfile, length=262144)
-            except (BrokenPipeError, ConnectionResetError):
-                pass
-        return response.status
+        if path.startswith("api/"):
+            return self._json({"error": NO_SOURCE}, 503)
+        return self.send_error(503, NO_SOURCE)
 
     def _send_bytes(self, body, ctype, fuente, head=False, etag=None, gzipped=None):
         encoded = gzipped is not None and accepts_gzip(self.headers.get("Accept-Encoding", ""))
@@ -728,9 +498,9 @@ class Handler(SimpleHTTPRequestHandler):
             source.info()
             if source
             else {
-                "tipo": "legacy",
+                "tipo": "none",
                 "id": "",
-                "origen": str(ROOT),
+                "origen": "",
                 "anotaciones": "",
                 "perfil": "",
                 "endpoint": "",
@@ -1031,10 +801,7 @@ class Handler(SimpleHTTPRequestHandler):
                     etag=etag,
                     gzipped=compressed,
                 )
-            if self.fuente.manifest_rel and path in (
-                "catalog/_viewer/manifest-work3.js",
-                "all-gallery/derived-c019/manifest-c019-local.js",
-            ):
+            if self.fuente.manifest_rel and path in OPTIONAL_MANIFESTS:
                 return self._send_bytes(
                     b"// Generated index is authoritative.\n",
                     "application/javascript",
@@ -1287,15 +1054,7 @@ class Handler(SimpleHTTPRequestHandler):
                     )
                 except Exception as ex:
                     return self.send_error(502, str(ex))
-            if (
-                code == 404
-                and path
-                in (
-                    "catalog/_viewer/manifest-work3.js",
-                    "all-gallery/derived-c019/manifest-c019-local.js",
-                )
-                and not head
-            ):
+            if code == 404 and path in OPTIONAL_MANIFESTS and not head:
                 return self._send_bytes(
                     b"// Optional manifest absent.\n", "application/javascript", self.fuente.tipo
                 )
@@ -1312,13 +1071,14 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         self.fuente = getattr(self.server, "fuente", None)
         path = unquote(urlsplit(self.path).path).lstrip("/")
-        if self.fuente or path == "api/origen":
-            if not self._host_local():
-                return self.send_error(403)
+        if not self._host_local():
+            return self.send_error(403)
         if path == "api/origen":
             return self._json(self._origen_info())
         if self._codigo():
             return
+        if not self.fuente and path != "api/rollo.js":
+            return self._sin_origen()
         if path.startswith("api/mascara-par/"):
             return self._leer_par(path[len("api/mascara-par/") :])
         if urlsplit(self.path).path == "/api/rollo.js":
@@ -1330,112 +1090,20 @@ class Handler(SimpleHTTPRequestHandler):
                 try:
                     src = cargar_rollo(q, self.fuente)
                 except (ValueError, FileNotFoundError):
-                    return self.send_error(404, f"no existe el rollo {q}")
+                    return self.send_error(404, f"Unknown scroll {q}")
                 except Exception as e:
                     return self.send_error(502, str(e))
                 proxy = (
-                    {"tipo": self.fuente.tipo, "origen": self.fuente.origen}
-                    if self.fuente
-                    else {
-                        "espejo_work3": espejo_de(src["scroll"]),
-                        "etiquetas_sin_segmento": f"_unresolved/{src['scroll']}",
-                    }
+                    {"tipo": self.fuente.tipo, "origen": self.fuente.origen} if self.fuente else {}
                 )
                 info = dict(src, proxy=proxy)
             elif ROLLO:
-                info = dict(
-                    ROLLO, proxy={"espejo_work3": ESPEJO, "etiquetas_sin_segmento": LABELS_UNKNOWN}
-                )
+                info = dict(ROLLO, proxy={})
             else:
                 info = {}
             body = ("window.ROLLO_SERVIDOR=" + json.dumps(info, ensure_ascii=True) + ";\n").encode()
             return self._send_bytes(body, "application/javascript; charset=utf-8", "proxy")
-        if self.fuente:
-            return self._fuente_get()
-        if self.path.startswith("/api/propuestas"):
-            # GET /api/propuestas -> ["<lamina>", ...] con etiquetas propuestas (labels/por-profundidad/_propuestas/ en work-3)
-            laminas = index("propuestas.json")
-            return self._json(sorted(laminas) if isinstance(laminas, list) else [])
-        if self.path.startswith("/api/etiqueta/"):
-            # GET /api/etiqueta/<lamina>/<c+NN>/<file>.png[?propuesta=1] -> la etiqueta desde work-3 (oficial o _propuestas/)
-            q = urlsplit(self.path)
-            rel = unquote(q.path[len("/api/etiqueta/") :])
-            prop = "propuesta=1" in (q.query or "")
-            if ".." in rel.split("/"):
-                return self.send_error(400, "Invalid path")
-            params = parse_qs(q.query)
-            base = labels_base(
-                rel.split("/")[0], params.get("base", [None])[0], params.get("rollo", [None])[0]
-            )
-            url = work3_url(
-                f"catalog/{base}/labels/por-profundidad/" + ("_propuestas/" if prop else "") + rel
-            )
-            if (
-                "opcional=1" in (q.query or "")
-            ):  # 25-sep (etiq_herramientas.js): lo que puede no existir -> 204, sin error en la consola
-                if self._stream(url, missing_ok=True) == 404:
-                    self.send_response(204)
-                    self.end_headers()
-                return
-            return self._stream(url)
-        if self.path.startswith("/api/dims/"):
-            # GET /api/dims/<rel>.png -> {"w","h"} from the PNG header (24 bytes: Mac file, else a work-3 Range). Lets the viewer
-            # show the 1/4 preview upscaled to the EXACT full-res size without downloading the PNG (12-sep, HD off by default).
-            rel = unquote(self.path[len("/api/dims/") :].split("?")[0])
-            try:
-                if ".." in Path(rel).parts:
-                    raise ValueError("Invalid path")
-                mac = load_mac_index().get(rel)
-                loc = next(
-                    (
-                        q
-                        for q in (ROOT / rel, CACHE / rel, ROOT / mac if mac else None)
-                        if q and q.is_file()
-                    ),
-                    None,
-                )
-                if loc:
-                    hdr = loc.open("rb").read(24)
-                else:
-                    try:
-                        req = urllib.request.Request(
-                            work3_url(rel), headers={"Range": "bytes=0-23"}
-                        )
-                        with urllib.request.urlopen(req, timeout=WORK3_TIMEOUT) as response:
-                            hdr = response.read(24)
-                    except urllib.error.HTTPError as e:
-                        key = load_s3_once_index().get(rel)
-                        if e.code != 404 or not key:
-                            raise
-                        hdr = s3_once(rel, key)[:24]
-                if hdr[:8] != b"\x89PNG\r\n\x1a\n":
-                    raise ValueError("Not a PNG header")
-                w, h = struct.unpack(">II", hdr[16:24])
-                return self._json({"w": w, "h": h})
-            except Exception as e:
-                return self.send_error(404, str(e)[:120])
-        path = unquote(urlsplit(self.path).path).lstrip("/")
-        if ".." in Path(path).parts:
-            return self.send_error(400, "Invalid path")
-        if (ROOT / path).is_file() or (ROOT / path / "index.html").is_file():
-            return super().do_GET()
-        if (CACHE / path).is_file():
-            return self._serve_file(CACHE / path)
-        mac = load_mac_index().get(path)
-        if mac and (ROOT / mac).is_file():
-            return self._serve_file(ROOT / mac)
-        key = load_s3_once_index().get(path) if path.startswith("catalog/") else None
-        if not key:
-            return self._stream(work3_url(path))
-        if self._stream(work3_url(path), missing_ok=True) == 404:
-            try:
-                body = s3_once(path, key)
-            except Exception as e:
-                log(f"!! S3 -> work-3 fallo {path}: {str(e)[:160]}")
-                return self.send_error(502, "no se pudo traer de S3 a work-3")
-            self._send_bytes(
-                body, TYPES.get(Path(path).suffix, "application/octet-stream"), "s3->work-3"
-            )
+        return self._fuente_get()
 
     def _datos_par(self, lamina):
         params = parse_qs(urlsplit(self.path).query)
@@ -1450,7 +1118,7 @@ class Handler(SimpleHTTPRequestHandler):
         return params, base, depth, rollo, folder, recorte
 
     def _leer_par(self, lamina):
-        if self.fuente and self.headers.get("X-Visor-Origen") not in (None, self.fuente.id):
+        if self.headers.get("X-Visor-Origen") not in (None, self.fuente.id):
             return self._json(
                 {"error": "El origen cambio; recarga antes de importar mascaras"}, 409
             )
@@ -1505,27 +1173,20 @@ class Handler(SimpleHTTPRequestHandler):
                 )
             bodies = []
             # Resolve both generation members under one lock, never through separate HTTP snapshots.
-            with self.fuente.mascara_lock if self.fuente else _guard:
-                local_folder = self.fuente.mascara_local(folder) if self.fuente else None
+            with self.fuente.mascara_lock:
+                local_folder = self.fuente.mascara_local(folder)
                 for suffix in ("inklabels", "supervision_mask"):
                     rel = folder + "/" + lamina + "_" + suffix + ".png"
-                    local = (
-                        local_folder / (lamina + "_" + suffix + ".png") if local_folder else None
-                    )
+                    local = local_folder / (lamina + "_" + suffix + ".png")
                     try:
-                        if local and local.is_file():
+                        if local.is_file():
                             body = local.read_bytes()
-                        elif self.fuente:
+                        else:
                             with self.fuente.abrir(self.fuente.ruta_catalogo(rel)) as (
                                 _,
                                 _,
                                 stream,
                             ):
-                                body = stream.read(MASK_LIMIT + 1)
-                        else:
-                            with urllib.request.urlopen(
-                                work3_url(rel), timeout=WORK3_TIMEOUT
-                            ) as stream:
                                 body = stream.read(MASK_LIMIT + 1)
                         bodies.append(body)
                     except (FileNotFoundError, urllib.error.HTTPError) as error:
@@ -1560,13 +1221,6 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": str(error)}, 502)
 
     def _guardar_par(self, lamina):
-        if not self.fuente:
-            return self._json(
-                {
-                    "error": "El escritor legacy no ofrece transacciones de pares. Configura una carpeta local de anotaciones."
-                },
-                501,
-            )
         try:
             n = int(self.headers.get("Content-Length", 0))
             if self.headers.get_content_type() != "application/json" or not 0 < n <= MASK_LIMIT:
@@ -1665,21 +1319,20 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_error(403)
         if self.headers.get("Origin") not in (None, "http://" + self.headers["Host"]):
             return self._json({"error": "Origen del navegador no autorizado"}, 403)
-        if self.fuente:
-            if self.headers.get("X-Visor-Origen") != self.fuente.id:
-                return self._json(
-                    {"error": "Origen distinto o pestana desactualizada; recarga antes de guardar"},
-                    409,
-                )
-            if not self.fuente.anotaciones:
-                return self._json(
-                    {"error": "Origen de solo lectura: configura una carpeta de anotaciones"}, 403
-                )
+        if not self.fuente:
+            return self._json({"error": NO_SOURCE}, 503)
+        if self.headers.get("X-Visor-Origen") != self.fuente.id:
+            return self._json(
+                {"error": "Origen distinto o pestana desactualizada; recarga antes de guardar"},
+                409,
+            )
+        if not self.fuente.anotaciones:
+            return self._json(
+                {"error": "Origen de solo lectura: configura una carpeta de anotaciones"}, 403
+            )
         if path.startswith("api/mascara-par/"):
             return self._guardar_par(path[len("api/mascara-par/") :])
         if path == "api/inksdk/trabajos":
-            if not self.fuente:
-                return self._json({"error": "ink-sdk jobs need a configured source"}, 400)
             ok, why = inksdk.disponible()
             if not ok:
                 return self._json({"error": why}, 503)
@@ -1734,7 +1387,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(
                     {"error": "Los miembros de un par se guardan juntos: usa /api/mascara-par"}, 409
                 )
-            if self.fuente and any(
+            if any(
                 (
                     Path(self.fuente.anotaciones) / self.fuente.id / ("catalog/" + key)
                 ).parent.is_symlink()
@@ -1750,26 +1403,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": str(error)}, 400)
         for key in claves:
             try:
-                if self.fuente:
-                    self.fuente.guardar_mascara("catalog/" + key, body)
-                    status, reply = 201, {"status": "created"}
-                else:
-                    status, reply = writer_put(key, body)
+                self.fuente.guardar_mascara("catalog/" + key, body)
             except (OSError, ValueError, PermissionError) as error:
                 return self._json({"error": str(error)}, 500)
-            if status >= 300:
-                if rel.endswith(".json") and status == 400:
-                    return self._json(
-                        {
-                            "ok": False,
-                            "motivo": "catalog_writer no acepta JSON; usa un par con metadatos PNG",
-                        }
-                    )
-                return self._json({"error": "No se pudo guardar en el escritor legacy"}, 502)
         return self._json(
             {
                 "ok": True,
-                "destino": "anotaciones-locales" if self.fuente else "work-3",
+                "destino": "anotaciones-locales",
                 "clave": claves[0],
                 "clave_profundidad": claves[1] if len(claves) > 1 else None,
             }
@@ -1802,7 +1442,7 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     global PORT, LOG_FILE
     ap = argparse.ArgumentParser(
-        description="Proxy del visor (todos los rollos del docroot; ver el docstring del modulo)."
+        description="Serve the ink viewer for a local, HTTP, S3 or official data source."
     )
     ap.add_argument(
         "--scroll",
@@ -1811,11 +1451,6 @@ def main():
     )
     ap.add_argument(
         "--port", type=int, default=PORT, help="puerto (S3CACHE_PORT; 8797 por defecto)"
-    )
-    ap.add_argument(
-        "--raiz",
-        default=os.environ.get("VISOR_RAIZ"),
-        help="docroot con all-gallery/ y los indices (VISOR_RAIZ; por defecto el directorio actual)",
     )
     ap.add_argument(
         "--dry-run",
@@ -1889,12 +1524,13 @@ def main():
                     data[key] = value
             source = Fuente(**data)
         else:
-            source = None  # The source picker remains available; legacy routing requires explicit environment configuration.
-        if source and a.raiz:
-            ap.error("--raiz es del modo legacy; usa --origen para elegir la carpeta de datos")
+            source = None  # the page opens with the source picker
     except (ValueError, TypeError, OSError) as e:
         ap.error(str(e))
-    info = configurar(a.scroll, a.raiz, source)
+    try:
+        info = configurar(a.scroll, source)
+    except (ValueError, TypeError, OSError) as e:
+        ap.error("--scroll: " + str(e))
     PORT = info["port"] = a.port
     if source:
         info = dict(source.info(), port=a.port, config=str(config_path), codigo=str(CODE))
@@ -1909,19 +1545,15 @@ def main():
     if a.dry_run:
         print(json.dumps(info, indent=1, ensure_ascii=False))
         return
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    LOG_FILE = config_path.parent / "visor.log"
     if source:
         source.verificar()
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        LOG_FILE = config_path.parent / "visor.log"
         log(
             f"arrancando en :{PORT}; origen {source.tipo}: {source.origen}; anotaciones: {source.anotaciones or 'solo lectura'}"
         )
     else:
-        log(
-            f"arrancando {'todos los rollos' if not SCROLL else SCROLL} en :{PORT}, docroot={ROOT}; imagenes: Mac -> work-3 "
-            f"({WORK3_BASE}) -> S3 una vez a work-3; etiquetas en work-3"
-            + (f" (sin segmento: {LABELS_UNKNOWN})" if LABELS_UNKNOWN else "")
-        )
+        log(f"starting on :{PORT} with no source; choose one in the viewer (Change source)")
     srv = ThreadingHTTPServer((BIND, PORT), Handler)
     srv.fuente, srv.config_path, srv.ct_fuente = source, config_path, ct_source
     srv.config_token, srv.config_lock = secrets.token_urlsafe(32), threading.Lock()

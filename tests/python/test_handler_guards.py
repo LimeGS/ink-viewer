@@ -9,7 +9,7 @@ from test_fuentes import servidor
 
 
 class HandlerGuards(unittest.TestCase):
-    def test_preview_health_headers_and_legacy_write_restrictions(self):
+    def test_preview_health_headers_and_write_restrictions(self):
         deployment = {"commit": "a" * 40, "preview": True, "channel": "preview"}
         handler = deploy_runtime.handler_for(proxy, deployment, preview=True)
         with servidor(handler) as (_, base):
@@ -20,12 +20,13 @@ class HandlerGuards(unittest.TestCase):
                 self.assertEqual(response.headers["X-Visor-Version"], "a" * 40)
             with urllib.request.urlopen(base + "/api/origen") as response:
                 self.assertFalse(json.load(response)["escritura"])
-            for path in ("/api/origen", "/api/mascara-par/x"):
+            # The preview source is fixed; with no source nothing can be saved.
+            for path, code in (("/api/origen", 403), ("/api/mascara-par/x", 503)):
                 with self.assertRaises(urllib.error.HTTPError) as error:
                     urllib.request.urlopen(
                         urllib.request.Request(base + path, data=b"{}", method="POST")
                     )
-                self.assertEqual(error.exception.code, 403)
+                self.assertEqual(error.exception.code, code)
             with self.assertRaises(urllib.error.HTTPError) as error:
                 urllib.request.urlopen(
                     urllib.request.Request(
@@ -33,4 +34,3 @@ class HandlerGuards(unittest.TestCase):
                     )
                 )
             self.assertEqual(error.exception.code, 403)
-
