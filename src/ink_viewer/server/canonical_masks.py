@@ -11,11 +11,7 @@ _cache = {}
 def inventory(source):
     if not source or source.tipo != "local":
         return None
-    path = (
-        source.vast_index_root / "_viewer/canonical-masks.json"
-        if hasattr(source, "vast_index_root")
-        else Path(source.origen) / INDEX
-    )
+    path = Path(source.origen) / INDEX
     if not path.exists():
         return None
     stat = path.stat()
@@ -31,8 +27,6 @@ def inventory(source):
 
 
 def asset_path(source, asset):
-    if hasattr(source, "vast_asset_path"):
-        return source.vast_asset_path(asset)
     root = (Path(source.origen) / "catalog").resolve()
     path = Path(asset["canonical"]).resolve(strict=True)
     rel = path.relative_to(root)

@@ -1,13 +1,11 @@
 import argparse
-import contextlib
-import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ink_viewer.deployment import verify_vast_live, viewerctl
+from ink_viewer.deployment import viewerctl
 
 
 class DeploymentGuards(unittest.TestCase):
@@ -110,14 +108,3 @@ class DeploymentGuards(unittest.TestCase):
         file.unlink()
         viewerctl.stop(self.site, "preview")
 
-    def test_live_verifier_rejects_other_sources_before_reading_assets(self):
-        with (
-            patch.object(
-                verify_vast_live.urllib.request,
-                "urlopen",
-                return_value=contextlib.closing(io.BytesIO(b'{"origen":"other-source"}')),
-            ),
-            patch("sys.argv", ["verify", "--site", str(self.site)]),
-            self.assertRaises(AssertionError),
-        ):
-            verify_vast_live.main()
