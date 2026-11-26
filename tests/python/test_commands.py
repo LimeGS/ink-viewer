@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ink_viewer.deployment import deploy_runtime, publish_preview, vast_ctl, viewerctl
+from ink_viewer.deployment import deploy_runtime, publish_preview, viewerctl
 from ink_viewer.server import s3cache_proxy as proxy
 
 
@@ -263,81 +263,3 @@ class Commands(unittest.TestCase):
         with self.assertRaises(ValueError):
             publish_preview.code_bundle(self.root, "invalid", self.root / "bad.bundle")
 
-    def test_vast_controller_starts_cpu_only_and_refreshes_only_its_site(self):
-        site = self.root / "vast"
-        site.mkdir()
-        with (
-            patch.object(vast_ctl.socket, "socket") as sock,
-            patch.object(vast_ctl.subprocess, "Popen") as launch,
-            patch.object(
-                vast_ctl.urllib.request,
-                "urlopen",
-                return_value=contextlib.closing(io.BytesIO(b"{}")),
-            ),
-        ):
-            launch.return_value.pid = 99999999
-            launch.return_value.poll.return_value = None
-            result = json.loads(self.invoke(vast_ctl, ["start", "--site", str(site)]))
-            self.assertEqual(result["pid"], 99999999)
-            self.assertEqual(sock.return_value.bind.call_args.args[0], ("127.0.0.1", 8798))
-            self.assertEqual(launch.call_args.kwargs["env"]["CUDA_VISIBLE_DEVICES"], "")
-            self.assertEqual(launch.call_args.kwargs["env"]["OMP_NUM_THREADS"], "1")
-            self.assertIn("ink_viewer.server.vast_server", launch.call_args.args[0])
-        # A stale /proc entry must never cause an unrelated process to be signalled.
-        self.assertFalse(
-            json.loads(self.invoke(vast_ctl, ["status", "--site", str(site)]))["running"]
-        )
-        with patch.object(vast_ctl.subprocess, "run") as refresh:
-            self.invoke(vast_ctl, ["refresh", "--site", str(site)])
-            self.assertIn("ink_viewer.catalog.vast_catalog", refresh.call_args.args[0])
-        self.assertFalse(
-            json.loads(self.invoke(vast_ctl, ["stop", "--site", str(site)]))["stopped"]
-        )
-
-    def test_vast_controller_rejects_pid_reuse_and_checks_owned_process(self):
-        site = self.root / "vast"
-        site.mkdir()
-        (site / "process.json").write_text('{"pid":4242}')
-        real_path = Path
-
-        def proc_path(value):
-            if str(value).startswith("/proc/"):
-                obj = MagicMock()
-                obj.read_text.return_value = "State: S (sleeping)"
-                obj.read_bytes.return_value = (
-                    b"python\0-m\0ink_viewer.server.vast_server\0--site\0"
-                    + str(site).encode()
-                    + b"\0"
-                )
-                obj.resolve.return_value = vast_ctl.SOURCE_ROOT
-                obj.exists.return_value = False
-                return obj
-            return real_path(value)
-
-        with (
-            patch.object(vast_ctl, "Path", side_effect=proc_path),
-            patch.object(vast_ctl.os, "kill") as kill,
-        ):
-            with self.assertRaises(RuntimeError):
-                self.invoke(vast_ctl, ["refresh", "--site", str(site)])
-            self.assertTrue(
-                json.loads(self.invoke(vast_ctl, ["status", "--site", str(site)]))["pid"] == 4242
-            )
-            self.assertTrue(
-                json.loads(self.invoke(vast_ctl, ["stop", "--site", str(site)]))["stopped"]
-            )
-            kill.assert_called_once_with(4242, vast_ctl.signal.SIGTERM)
-
-        def unrelated(value):
-            result = proc_path(value)
-            if str(value).startswith("/proc/"):
-                result.read_bytes.return_value = b"other-process"
-            return result
-
-        with (
-            patch.object(vast_ctl, "Path", side_effect=unrelated),
-            patch.object(vast_ctl.os, "kill") as kill,
-            self.assertRaises(RuntimeError),
-        ):
-            self.invoke(vast_ctl, ["stop", "--site", str(site)])
-        kill.assert_not_called()

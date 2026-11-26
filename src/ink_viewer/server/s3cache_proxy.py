@@ -550,8 +550,6 @@ def manifest_bytes(source, revision):
     data = source.indice(source.manifest_rel, limite=256 * 2**20)
     if not isinstance(data, list):
         raise ValueError("The manifest must be a list")
-    if hasattr(source, "browser_manifest"):
-        data = source.browser_manifest(data)
     body = ("window.manifest=" + json.dumps(data, separators=(",", ":")) + ";\n").encode()
     return encoded_bytes(body)
 
@@ -886,7 +884,7 @@ class Handler(SimpleHTTPRequestHandler):
         from PIL import Image
 
         # Whole-segment maps reach a few hundred megapixels (an official 2.4 um map is 14760 x 18520); allow them as
-        # canonical_masks and the Vast catalog do. The byte cap below still bounds what is read.
+        # canonical_masks does. The byte cap below still bounds what is read.
         Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, MAP_PIXELS)
         # Only decode a requested 2D ink map, never CT volumes or TIFXYZ mesh coordinates.
         with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as image_file:
@@ -1009,12 +1007,7 @@ class Handler(SimpleHTTPRequestHandler):
             ruta_dentro(Path("/"), path)
             if path == "all-gallery/manifest.js" and self.fuente.manifest_rel:
                 if self.fuente.tipo == "local":
-                    manifest_root = (
-                        self.fuente.site / "cache"
-                        if hasattr(self.fuente, "vast_index_root")
-                        else Path(self.fuente.origen)
-                    )
-                    stat = ruta_dentro(manifest_root, self.fuente.manifest_rel).stat()
+                    stat = ruta_dentro(Path(self.fuente.origen), self.fuente.manifest_rel).stat()
                     revision = (stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
                     body, compressed, etag = manifest_bytes(self.fuente, revision)
                 else:

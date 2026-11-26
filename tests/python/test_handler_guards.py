@@ -1,16 +1,10 @@
-import contextlib
-import io
 import json
-import tempfile
 import unittest
 import urllib.error
 import urllib.request
-from pathlib import Path
-from unittest.mock import patch
 
 from ink_viewer.deployment import deploy_runtime
 from ink_viewer.server import s3cache_proxy as proxy
-from ink_viewer.server import vast_server
 from test_fuentes import servidor
 
 
@@ -40,21 +34,3 @@ class HandlerGuards(unittest.TestCase):
                 )
             self.assertEqual(error.exception.code, 403)
 
-    def test_vast_entrypoint_binds_loopback_and_loads_existing_manifest(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            site = Path(tmp)
-            (site / "cache/_viewer").mkdir(parents=True)
-            (site / "cache/_viewer/manifest.json").write_text('[{"id":"fixture"}]')
-            with (
-                patch("sys.argv", ["vast", "--site", str(site), "--port", "18102"]),
-                patch.object(vast_server, "VastSource") as source,
-                patch.object(proxy, "configurar"),
-                patch.object(proxy, "LOG_FILE", None),
-                patch.object(vast_server, "ThreadingHTTPServer") as server,
-                contextlib.redirect_stdout(io.StringIO()),
-            ):
-                vast_server.main()
-                source.return_value.verificar.assert_called_once()
-                self.assertEqual(server.call_args.args[0], ("127.0.0.1", 18102))
-                self.assertEqual(server.return_value.runs, [{"id": "fixture"}])
-                server.return_value.serve_forever.assert_called_once()

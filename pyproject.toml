@@ -16,7 +16,6 @@ dependencies = ["boto3", "Pillow"]
 ink-viewer = "ink_viewer.server.s3cache_proxy:main"
 ink-viewer-deploy = "ink_viewer.deployment.viewerctl:main"
 ink-viewer-publish = "ink_viewer.deployment.publish_preview:main"
-ink-viewer-vast = "ink_viewer.deployment.vast_ctl:main"
 ink-viewer-manifest = "ink_viewer.catalog.generar_manifest:main"
 
 [tool.setuptools.packages.find]

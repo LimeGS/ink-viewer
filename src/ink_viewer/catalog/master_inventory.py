@@ -34,8 +34,6 @@ def dump(x):
 def root(source):
     if not source or source.tipo != "local":
         raise ValueError("El inventario maestro requiere el catálogo local")
-    if hasattr(source, "vast_index_root"):
-        return source.vast_index_root
     return Path(source.origen) / "catalog"
 
 
@@ -134,9 +132,7 @@ CREATE INDEX segments_roll ON segments(roll);CREATE INDEX segments_name ON segme
                 if (m := re.search(r"catalog/([^/]+)/segments/([^/]+)/", str(f)))
             ]
             unique = set(entries)
-            if run.get("vastEntry"):
-                roll, name, kind = (run["vastEntry"][k] for k in ("roll", "name", "kind"))
-            elif len(unique) == 1:
+            if len(unique) == 1:
                 roll, name = next(iter(unique))
                 kind = "segment"
             else:
@@ -350,8 +346,6 @@ def detail(source, key):
                 if base.is_dir()
                 else []
             )
-        if hasattr(source, "vast_entry"):
-            result.update(source.vast_entry(key))
         return result
 
 
@@ -364,8 +358,6 @@ def get_run(source, key):
 
 
 def map_info(source, run, depth, contrast="fixed"):
-    if hasattr(source, "vast_map_info"):
-        return source.vast_map_info(run, depth, contrast)
     from PIL import Image
 
     Image.MAX_IMAGE_PIXELS = 1_000_000_000
