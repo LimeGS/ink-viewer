@@ -236,7 +236,7 @@ class Fuente:
                     import boto3
                     from botocore.config import Config
                 except ImportError as e:
-                    raise RuntimeError("El modo S3 necesita boto3: instala requirements.txt") from e
+                    raise RuntimeError("S3 sources need boto3: pip install boto3") from e
                 session = boto3.Session(profile_name=self.perfil or None)
                 self._s3 = session.client(
                     "s3",

@@ -10,7 +10,24 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE", "LICENSE-Inter.txt"]
+authors = [{ name = "Leonel Wainer" }, { name = "Paulo Sergio Camillo" }]
+keywords = ["vesuvius-challenge", "ink-detection", "annotation", "herculaneum", "viewer"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
 dependencies = ["boto3", "Pillow"]
+
+[project.urls]
+Homepage = "https://github.com/LimeGS/ink-viewer"
+Documentation = "https://github.com/LimeGS/ink-viewer/blob/main/docs/guide.md"
+Issues = "https://github.com/LimeGS/ink-viewer/issues"
 
 [project.scripts]
 ink-viewer = "ink_viewer.server.s3cache_proxy:main"

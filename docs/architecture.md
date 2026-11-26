@@ -4,9 +4,9 @@ The application is a Python package with a server-rendered entry page and browse
 
 ## Component boundaries
 
-- `server`: HTTP routing, data-source access, canonical mask validation and the read-only catalog adapter. It serves source assets from `web`, independently of the selected dataset.
+- `server`: HTTP routing, data-source access (local, HTTP, S3 and the official open-data bucket) and canonical mask validation. It serves source assets from `web`, independently of the selected dataset.
 - `catalog`: filename conventions, inventory discovery, generated manifests, existing measured v5 scores and imported scientific gates. Generated indexes live at the selected dataset or deployment, outside the code checkout.
-- `deployment`: immutable Git releases, preview isolation, promotion/rollback and catalog process management. It operates on explicit deployment directories and preserves machine-owned settings and data.
+- `deployment`: immutable Git releases, preview isolation and promotion/rollback. It operates on explicit deployment directories and preserves machine-owned settings and data.
 - `web`: markup, styles, browser behavior and bundled branding. `js/viewer.js` contains the main viewer logic previously embedded in the HTML; the remaining UI tools retain their original modules and execution order.
 
 `paths.py` owns static asset and release locations. Imports use the `ink_viewer` namespace. Runtime data, annotations, caches, credentials and machine profiles do not belong in `src`.

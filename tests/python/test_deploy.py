@@ -46,6 +46,11 @@ class Deployment(unittest.TestCase):
                 "package-lock.json",
                 ".c8rc.json",
                 ".github/workflows/audit.yml",
+                # Repository metadata the real history holds (publication refused it before).
+                ".github/workflows/lint.yml",
+                "Dockerfile",
+                ".dockerignore",
+                "docs/images/ui-overview.jpg",
             ):
                 (repo / name).parent.mkdir(parents=True, exist_ok=True)
                 (repo / name).write_text("source fixture")
@@ -75,6 +80,7 @@ class Deployment(unittest.TestCase):
             self.assertEqual((clone / "inter-17fe38ab302c7e5d.woff2").read_bytes(), b"font fixture")
             self.assertTrue((clone / "LICENSE-Inter.txt").is_file())
             self.assertFalse((clone / "local-config.json").exists())
+            self.assertTrue((clone / "docs/images/ui-overview.jpg").is_file())
             git("rm", "local-config.json")
             git("commit", "-m", "remove data at tip")
             blocked = root / "blocked.bundle"
