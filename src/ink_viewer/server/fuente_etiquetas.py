@@ -18,6 +18,7 @@ HTTP root with the same layout), VISOR_INKLABELS_CACHE the index cache (~/.cache
 
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import os
@@ -57,6 +58,11 @@ def sample_id(scroll):
     """Viewer sample id for a dataset scroll folder: PHercParis4_Scroll1 -> PHercParis4, Fragments -> PHercFragments."""
     head = re.sub(r"[^A-Za-z0-9]", "", scroll.split("_")[0])
     return head if head.startswith("PHerc") else "PHerc" + head
+
+
+def identidad(path):
+    """Stand-in mesh identity of an entry (the viewer checks it before reopening a mask): its dataset folder."""
+    return hashlib.sha256(("ink-labels:" + path).encode()).hexdigest()
 
 
 def frame(sample, entry, c):
@@ -108,6 +114,7 @@ def construir(rows):
                     "meshPath": "",
                     "receiptPath": "",
                     "basis": "ink-labels dataset entry",
+                    "meshSha256": identidad(path),
                 },
                 "inkLabels": {
                     "scroll": row.get("scroll"),
@@ -324,6 +331,13 @@ class FuenteEtiquetas(Fuente):
             "ancho": int(label.shape[1]),
             "alto": int(label.shape[0]),
             "profundidad": c,
+            "scroll": sample,
+            "cara": "unknown",
+            # the run, source folder and identity the viewer records for this entry: it reopens the label as its own mask
+            "run_id": "inklabels_" + entry,
+            "directorio_fuente": f"{sample}/segments/{entry}/ink-detection",
+            "malla_sha256": identidad(self._carpeta(entry)),
+            "orientacion": {"correccion": [0, 0, 0], "clase": "SIN_CORRECCION"},
             "origen": f"ink-labels dataset style {self.style}",
             "dataset_path": self._carpeta(entry),
         }

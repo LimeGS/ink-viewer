@@ -213,6 +213,17 @@ class InkLabels(unittest.TestCase):
             )
             np.testing.assert_array_equal(ink, (self.label == 1) * 255)
             np.testing.assert_array_equal(sup, np.isin(self.label, (0, 1)) * 255)
+            manifest = {e["id"]: e for e in source.indice("_viewer/manifest.json")}
+            entry = manifest["inklabels_" + ENTRY]
+            self.assertEqual(
+                (
+                    pair["corrida"]["run_id"],
+                    pair["corrida"]["directorio_fuente"],
+                    pair["corrida"]["malla_sha256"],
+                ),
+                (entry["id"], entry["sourceDirectory"], entry["meshAssociation"]["meshSha256"]),
+                "the browser recognises the label as this entry's own mask",
+            )
             self.assertEqual(
                 (pair["corrida"]["profundidad"], pair["corrida"]["base"]),
                 (-2, f"PHerc0500P2/segments/{ENTRY}"),
