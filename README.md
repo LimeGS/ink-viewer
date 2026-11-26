@@ -130,7 +130,7 @@ python -m pip install ".[corte]"
 ink-viewer --source ink-labels --annotations /path/to/annotations
 ```
 
-Opens [VSkinox's ink-label dataset](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels) (1,609 squares from 10 scrolls and fragments, one labelling rule for every source) straight from Hugging Face, with nothing to download first. Each entry is one series whose depth offsets are its 21 CT surface layers; search by entry name, or by quality and role (`q5`, `reference`). In **Label**, **Mask files → load saved mask** brings in the dataset label as a mask pair (ink, sure background, and ignore left unpainted) to review and correct; corrections are saved as ordinary pairs in the annotations folder. CC BY-NC 4.0; see [the guide](docs/guide.md#review-the-herculaneum-ink-label-dataset).
+Opens [VSkinox's ink-label dataset](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels) (1,609 squares from 10 scrolls and fragments, one labelling rule for every source) straight from Hugging Face, with nothing to download first. Each entry is one series whose depth offsets are its 21 CT surface layers; search by entry name, or by quality and role (`q5`, `reference`). In **Label**, **Mask files → load saved mask** brings in the dataset label as a mask pair (ink, sure background, and ignore left unpainted) to review and correct; corrections are saved as ordinary pairs in the annotations folder. CC BY-NC 4.0: when you use the labels, credit VSkinox and the original label authors listed on the [dataset card](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels). See [the guide](docs/guide.md#review-the-herculaneum-ink-label-dataset).
 
 <details>
 <summary><b>Public S3 or HTTP, without credentials</b></summary>
