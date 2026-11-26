@@ -1460,22 +1460,22 @@ def main():
         help="print the resolved settings (JSON) and exit, without opening the port or touching the network",
     )
     ap.add_argument(
-        "--origen",
         "--source",
+        "--origen",
         dest="origen",
         default=os.environ.get("VISOR_ORIGEN"),
         help='dataset root: local folder, HTTP/HTTPS URL, s3://bucket/prefix, or "official" for the Vesuvius Challenge open-data bucket; no fallback to another source',
     )
     ap.add_argument(
-        "--anotaciones",
         "--annotations",
+        "--anotaciones",
         dest="anotaciones",
         default=os.environ.get("VISOR_ANOTACIONES", ""),
         help="separate local folder for saved masks; omitted = read-only",
     )
     ap.add_argument(
-        "--s3-perfil",
         "--s3-profile",
+        "--s3-perfil",
         dest="s3_perfil",
         default=os.environ.get("VISOR_S3_PERFIL", ""),
         help="AWS profile; omitted = the standard SDK credential chain",
@@ -1489,8 +1489,8 @@ def main():
         "--s3-region", default=os.environ.get("VISOR_S3_REGION", ""), help="region of the S3 source"
     )
     ap.add_argument(
-        "--ct-origen",
         "--ct-source",
+        "--ct-origen",
         dest="ct_origen",
         default=os.environ.get("VISOR_CT_ORIGEN", ""),
         help="where cross-sections read meshes and CT when the map source lacks them: a root holding PHerc... "
@@ -1539,7 +1539,7 @@ def main():
     try:
         ct_source = corte.fuente_ct(a.ct_origen)
     except (ValueError, TypeError, OSError) as e:
-        ap.error("--ct-origen: " + str(e))
+        ap.error("--ct-source: " + str(e))
     info["ct_origen"] = ct_source.origen if ct_source else ""
     if a.annotations_hf and not (source and source.anotaciones):
         ap.error("--annotations-hf mirrors saved masks: it needs --annotations")

@@ -283,33 +283,33 @@ def construir(source, scroll=None, verificar_mallas=False):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--origen",
         "--source",
+        "--origen",
         dest="origen",
         required=True,
         help="sample folder, catalog root or s3://bucket/prefix",
     )
     ap.add_argument("--scroll", help="explicit sample for a renamed folder, or catalog filter")
     ap.add_argument(
-        "--salida",
         "--output",
+        "--salida",
         dest="salida",
         help="local root for _viewer/ outputs; required for S3 (then publish both files yourself)",
     )
-    ap.add_argument("--s3-perfil", "--s3-profile", dest="s3_perfil", default="")
+    ap.add_argument("--s3-profile", "--s3-perfil", dest="s3_perfil", default="")
     ap.add_argument("--s3-endpoint", default="")
     ap.add_argument("--s3-region", default="")
     ap.add_argument(
-        "--verificar-mallas",
         "--verify-meshes",
+        "--verificar-mallas",
         dest="verificar_mallas",
         action="store_true",
         help="read/hash mesh inputs against render receipts; may be expensive",
     )
     ap.add_argument("--dry-run", action="store_true", help="scan and print counts, without writing")
     ap.add_argument(
-        "--reemplazar",
         "--replace",
+        "--reemplazar",
         dest="reemplazar",
         action="store_true",
         help="explicitly replace an existing generated index",
@@ -323,7 +323,7 @@ def main(argv=None):
             else None
         )
         if not a.dry_run and output is None:
-            raise ValueError("S3 needs --salida; index an HTTP source on the server's disk")
+            raise ValueError("S3 needs --output; index an HTTP source on the server's disk")
         if (
             output
             and not a.reemplazar

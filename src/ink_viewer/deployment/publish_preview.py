@@ -2,6 +2,7 @@
 """Send a committed code bundle over SSH and update only the remote preview."""
 
 import argparse
+import fnmatch
 import json
 import re
 import shlex
@@ -71,9 +72,11 @@ def code_bundle(repo, commit, bundle):
         ".c8rc.json",
         ".github/workflows/tests.yml",
         ".github/workflows/audit.yml",
-        "docs/architecture.md",
-        "docs/guide.md",
+        "Dockerfile",
+        ".dockerignore",
     }
+    # Repository metadata that is never runtime data: CI workflows and documentation.
+    patterns = (".github/workflows/*.yml", "docs/*.md", "docs/images/*.jpg", "docs/images/*.png")
     suffixes = {".py", ".js", ".cjs", ".css", ".html"}
     for name in sorted(paths):
         path = Path(name)
@@ -89,14 +92,15 @@ def code_bundle(repo, commit, bundle):
             and path.suffix == ".cjs"
         )
         flat_source = "/" not in name and not name.startswith(".") and path.suffix in suffixes
+        meta = name in special or any(fnmatch.fnmatchcase(name, p) for p in patterns)
         if (
             ".." in path.parts
             or path.is_absolute()
             or any(part.startswith(".") for part in path.parts)
-            and name not in special
+            and not meta
         ):
             raise ValueError("Selected Git history contains data/configuration: " + name)
-        if not (name in special or nested_source or nested_test or flat_source):
+        if not (meta or nested_source or nested_test or flat_source):
             raise ValueError(
                 "Selected Git history contains data/configuration: "
                 + name

@@ -10,4 +10,4 @@ WORKDIR /work
 ENV S3CACHE_BIND=0.0.0.0 S3CACHE_PORT=8797 HOME=/tmp
 EXPOSE 8797
 ENTRYPOINT ["ink-viewer"]
-CMD ["--origen", "/data", "--anotaciones", "/annotations"]
+CMD ["--source", "/data", "--annotations", "/annotations"]

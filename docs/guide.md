@@ -50,14 +50,14 @@ This file belongs in `PHerc0306B/segments/example/ink-detection/`. PNG and singl
 Inspect discovery, then create the index at the same root you will pass to the viewer:
 
 ```sh
-ink-viewer-manifest --origen /absolute/path/to/catalog --dry-run
-ink-viewer-manifest --origen /absolute/path/to/catalog
-ink-viewer --origen /absolute/path/to/catalog
+ink-viewer-manifest --source /absolute/path/to/catalog --dry-run
+ink-viewer-manifest --source /absolute/path/to/catalog
+ink-viewer --source /absolute/path/to/catalog
 ```
 
-The generator writes `_viewer/manifest.json` and `_viewer/index-info.json`; it does not rewrite maps. Review the reported counts and problems. Use `--reemplazar` only when intentionally replacing an existing generated index. For a renamed sample folder, pass its explicit identity with `--scroll PHerc0306B`.
+The generator writes `_viewer/manifest.json` and `_viewer/index-info.json`; it does not rewrite maps. Review the reported counts and problems. Use `--replace` only when intentionally replacing an existing generated index. For a renamed sample folder, pass its explicit identity with `--scroll PHerc0306B`.
 
-Optional `--verificar-mallas` checks render receipts against mesh-input SHA-256 values and can read substantial data. Ordinary discovery leaves mesh associations unverified. Neither mode proves ink detection or scientific validity.
+Optional `--verify-meshes` checks render receipts against mesh-input SHA-256 values and can read substantial data. Ordinary discovery leaves mesh associations unverified. Neither mode proves ink detection or scientific validity.
 
 ### Existing viewer layouts and metadata
 
@@ -95,7 +95,7 @@ The index comes from the bucket's own `metadata.json` (the team's catalog of sam
 Use the bucket's **HTTPS object endpoint** as the source. Replace the uppercase placeholders, including the region and any prefix; omit the final prefix if the dataset is at the bucket root:
 
 ```sh
-ink-viewer --origen \
+ink-viewer --source \
   "https://YOUR_BUCKET.s3.YOUR_REGION.amazonaws.com/YOUR_DATASET_PREFIX"
 ```
 
@@ -123,9 +123,9 @@ curl --fail "https://YOUR_BUCKET.s3.YOUR_REGION.amazonaws.com/YOUR_DATASET_PREFI
 You can index a local copy of the catalog and publish the two `_viewer/` files alongside the same relative map paths. Alternatively, scan S3 with a profile allowed to list and read that prefix:
 
 ```sh
-ink-viewer-manifest --origen s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
-  --s3-perfil dataset-maintainer --s3-region YOUR_REGION \
-  --salida /absolute/path/to/generated-index
+ink-viewer-manifest --source s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
+  --s3-profile dataset-maintainer --s3-region YOUR_REGION \
+  --output /absolute/path/to/generated-index
 ```
 
 This writes local output only. It does not publish files or change bucket permissions. If you use the separately installed [AWS CLI](https://docs.aws.amazon.com/cli/latest/reference/s3/cp.html), upload just the generated index:
@@ -144,21 +144,21 @@ Use the dataset owner's existing publication policy to make the intended index a
 For an indexed bucket accessed through the AWS SDK:
 
 ```sh
-ink-viewer --origen s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
-  --s3-perfil research --s3-region YOUR_REGION
+ink-viewer --source s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
+  --s3-profile research --s3-region YOUR_REGION
 ```
 
-Omit `--s3-perfil` to use the [standard Boto3 credential chain](https://docs.aws.amazon.com/boto3/latest/guide/credentials.html), including an already configured workload role. Credentials are used by Python, not embedded in browser code. Configure them for the OS account that actually runs the service.
+Omit `--s3-profile` to use the [standard Boto3 credential chain](https://docs.aws.amazon.com/boto3/latest/guide/credentials.html), including an already configured workload role. Credentials are used by Python, not embedded in browser code. Configure them for the OS account that actually runs the service.
 
 For an S3-compatible store, provide its endpoint and region as required by that store:
 
 ```sh
-ink-viewer --origen s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
+ink-viewer --source s3://YOUR_BUCKET/YOUR_DATASET_PREFIX \
   --s3-endpoint https://storage.example.org \
-  --s3-region YOUR_REGION --s3-perfil research
+  --s3-region YOUR_REGION --s3-profile research
 ```
 
-Normal indexed browsing reads objects. Manifest generation also needs bucket listing permission for the selected prefix. Annotation saves still require a separate local `--anotaciones` directory; source-bucket write access is not needed.
+Normal indexed browsing reads objects. Manifest generation also needs bucket listing permission for the selected prefix. Annotation saves still require a separate local `--annotations` directory; source-bucket write access is not needed.
 
 ## Configuration
 
@@ -180,21 +180,21 @@ The default settings path is `~/.config/vesuvius-visor/config.json`. You can man
 ink-viewer --config /absolute/path/to/origin.json
 ```
 
-Keep the Spanish field and flag names shown here; they are the current CLI/API names. `anotaciones` is an existing local directory or an empty string for no server saves. `perfil`, `endpoint` and `region` apply only to `s3://` sources, so leave them empty for HTTPS. Never put secret keys in this JSON.
+The JSON keeps its Spanish field names (`origen`, `anotaciones`, `perfil`); they are the stored format. Every CLI flag has an English name, used throughout this guide; the Spanish flags (`--origen`, `--anotaciones`, `--s3-perfil`, `--ct-origen`, `--salida`, `--reemplazar`, `--verificar-mallas`) remain as aliases. `anotaciones` is an existing local directory or an empty string for no server saves. `perfil`, `endpoint` and `region` apply only to `s3://` sources, so leave them empty for HTTPS. Never put secret keys in this JSON.
 
 | CLI option | Environment variable | Purpose |
 | --- | --- | --- |
-| `--origen` | `VISOR_ORIGEN` | Local folder, HTTP/HTTPS root, S3 prefix or `official` |
-| `--anotaciones` | `VISOR_ANOTACIONES` | Separate local annotation directory |
+| `--source` | `VISOR_ORIGEN` | Local folder, HTTP/HTTPS root, S3 prefix or `official` |
+| `--annotations` | `VISOR_ANOTACIONES` | Separate local annotation directory |
 | `--annotations-hf` | `VISOR_ANNOTATIONS_HF` | Also push each saved mask pair to a Hugging Face dataset (`user/dataset`) |
-| `--s3-perfil` | `VISOR_S3_PERFIL` | AWS SDK profile name |
+| `--s3-profile` | `VISOR_S3_PERFIL` | AWS SDK profile name |
 | `--s3-endpoint` | `VISOR_S3_ENDPOINT` | S3-compatible service endpoint |
 | `--s3-region` | `VISOR_S3_REGION` | S3 region |
 | `--config` | `VISOR_CONFIG` | Persistent source settings path |
 | `--port` | `S3CACHE_PORT` | Loopback HTTP port; default `8797` |
 | `--scroll` | `SCROLL` | Default scroll selection |
 
-With no `--origen` and no saved settings, the viewer opens with an empty list and the **Change source** dialog; data requests answer 503 until a source is chosen. An explicit `--origen` selects a source at startup instead of loading the saved source. To resume the dialog's saved selection, start with `--config` alone and no `VISOR_ORIGEN` override. `--dry-run` prints resolved settings without starting HTTP or checking remote connectivity; do not confuse it with a successful data read.
+With no `--source` and no saved settings, the viewer opens with an empty list and the **Change source** dialog; data requests answer 503 until a source is chosen. An explicit `--source` selects a source at startup instead of loading the saved source. To resume the dialog's saved selection, start with `--config` alone and no `VISOR_ORIGEN` override. `--dry-run` prints resolved settings without starting HTTP or checking remote connectivity; do not confuse it with a successful data read.
 
 ## Deploy on your own server
 
@@ -226,7 +226,7 @@ Type=simple
 User=ink-viewer
 Group=ink-viewer
 WorkingDirectory=/var/lib/ink-viewer
-ExecStart=/opt/ink-viewer/.venv/bin/python -m ink_viewer --origen /srv/ink-viewer/catalog --anotaciones /srv/ink-viewer/annotations --config /var/lib/ink-viewer/origin.json --port 8797
+ExecStart=/opt/ink-viewer/.venv/bin/python -m ink_viewer --source /srv/ink-viewer/catalog --annotations /srv/ink-viewer/annotations --config /var/lib/ink-viewer/origin.json --port 8797
 Restart=on-failure
 RestartSec=3
 UMask=0077
@@ -235,7 +235,7 @@ UMask=0077
 WantedBy=multi-user.target
 ```
 
-For read-only service operation, omit `--anotaciones` from `ExecStart`. For remote storage, replace the explicit origin/options or use a prepared `--config` file. Credentials and profiles must be available to the service account rather than only to your interactive shell.
+For read-only service operation, omit `--annotations` from `ExecStart`. For remote storage, replace the explicit origin/options or use a prepared `--config` file. Credentials and profiles must be available to the service account rather than only to your interactive shell.
 
 ```sh
 sudo install -d -o ink-viewer -g ink-viewer /var/lib/ink-viewer /srv/ink-viewer/annotations
@@ -286,12 +286,12 @@ The viewer can run a public ink model on a segment through [ink-sdk](https://git
 python -m pip install -e ".[inksdk]"     # numpy, used to write the generated maps
 export INK_SDK_PYTHON=/path/to/ink-sdk/.venv/bin/python
 export VILLA=/path/to/villa VILLA_PY=/path/to/villa/ink-detection/.venv/bin/python   # 9 um models only
-ink-viewer --origen /absolute/path/to/catalog --anotaciones ~/ink-notes   # or any indexed HTTP/S3 source
+ink-viewer --source /absolute/path/to/catalog --annotations ~/ink-notes   # or any indexed HTTP/S3 source
 ```
 
 Inputs are the segment's published surface volumes, `<sample>/segments/<segment>/surface-volumes/<res>um-[<dist>m-]<keV>keV-volume-<id>.zarr`, read through the same source (local, HTTP or S3). Only level 0 is used; it is copied chunk by chunk into `INK_VIEWER_SV_CACHE` (default `~/.cache/ink-viewer/surface-volumes`, refused above `INK_VIEWER_SV_MAX_GB`, default 16). A model is offered for a volume only when the volume's resolution is within the model's declared scale tolerance.
 
-Outputs are never written to the source. Each job writes, under the annotations folder at `<anotaciones>/<source id>/generated/`, one catalog-named PNG per depth direction (model field `<profile>-fwd` / `-rev`), browsing previews, a receipt with the full ink-sdk receipt and the depth window, and a generated index that the server appends to the manifest (`fam`: `ink-sdk (generated here)`). Without an annotations folder the source is read-only and jobs are refused. Jobs run one at a time.
+Outputs are never written to the source. Each job writes, under the annotations folder at `<annotations>/<source id>/generated/`, one catalog-named PNG per depth direction (model field `<profile>-fwd` / `-rev`), browsing previews, a receipt with the full ink-sdk receipt and the depth window, and a generated index that the server appends to the manifest (`fam`: `ink-sdk (generated here)`). Without an annotations folder the source is read-only and jobs are refused. Jobs run one at a time.
 
 In the viewer, a **Run model** button appears in the toolbar only when ink-sdk is available and the source has an annotations folder. It opens a dialog for the open catalog segment: pick one of its surface volumes and a compatible model, then Run. The dialog follows the job and reloads the page when the maps are ready; they appear in the segment's list beside the source's own maps.
 
@@ -310,7 +310,7 @@ The **Cross-section** button turns on a mode where clicking a point on the map o
 
 It needs `python -m pip install -e ".[corte]"` (numpy, tifffile, numcodecs) and a source with the public layout: `<sample>/segments/<segment>/mesh/<segment-id>-on-<volume>-<res>um.tifxyz/` and `<sample>/volumes/<volume>-...zarr`. The map's catalog name says which CT volume it was rendered from (`-volume-<id>-`), and the mesh and the CT with that id are used; maps without a volume id cannot be matched. The slice is axial (one z plane, 512 voxels around the point, level 0), read chunk by chunk through the same source; only the chunks under the window are fetched. The map point is placed on the mesh grid with the mesh scale; when the map size does not match the mesh, the mapping falls back to proportional and the slice says so. Sources that cannot list folders (HTTP) use the public naming, built from the map name's resolution, distance and energy; volumes with an extra tag in their name (for example `-pag0-`) need a local or S3 source.
 
-A local copy of the maps rarely holds the CT, so meshes and CT can come from another, read-only root of `PHerc...` folders: `--ct-origen https://vesuvius-challenge-open-data.s3.amazonaws.com` (or `VISOR_CT_ORIGEN`) reads them from the public bucket without credentials, fetching only the chunks under each slice. Without it they are read from the map source.
+A local copy of the maps rarely holds the CT, so meshes and CT can come from another, read-only root of `PHerc...` folders: `--ct-source https://vesuvius-challenge-open-data.s3.amazonaws.com` (or `VISOR_CT_ORIGEN`) reads them from the public bucket without credentials, fetching only the chunks under each slice. Without it they are read from the map source.
 
 `GET /api/corte?rollo=&segmento=&volumen=&u=&v=[&w=&h=&tam=]` returns the PNG, with `X-Corte` (point in voxels, window, mapping) as a header.
 
@@ -348,10 +348,10 @@ Back up the complete external annotation directory. Source data, physical metada
 | Index loads, images fail | Preserve relative paths and the layout in `index-info.json`; confirm that each referenced object is readable. |
 | Remote page/API returns `403` | Use the documented localhost tunnel and matching local/remote ports. A custom Host header or cross-origin proxy needs explicit integration. |
 | Port already in use | Choose another `--port` and matching tunnel; managed deployments do not stop unrelated listeners. |
-| Save button disabled | Configure an existing writable local `--anotaciones` folder. Reading maps from S3 does not enable bucket writes. |
+| Save button disabled | Configure an existing writable local `--annotations` folder. Reading maps from S3 does not enable bucket writes. |
 | Brush waits or a comparison pane is view-only | Wait for the native image and restored mask. Annotation requires the selected pane to match the original mask grid. |
 | v5 score, area or physical depth is missing | Supply the actual dataset measurements and compatible sidecars. Missing values are not estimated by the viewer. |
-| New settings disappear on restart | An explicit `--origen` or environment override takes precedence over the saved source. |
+| New settings disappear on restart | An explicit `--source` or environment override takes precedence over the saved source. |
 
 Use `ink-viewer --help`, `ink-viewer-manifest --help` and `ink-viewer-deploy --help` for all current options. Source-mode logs are written next to the selected config as `visor.log`; managed deployment logs live under `<deployment>/state/<channel>/`.
 
@@ -451,5 +451,5 @@ writes `_viewer/*.json` as 0600) and keeps saved masks owned by you.
 
 Open http://127.0.0.1:8797/all-gallery/index.html. For a public S3 or HTTP dataset, skip
 the `/data` mount and pass the origin instead, for example
-`ink-viewer --origen https://YOUR_BUCKET.s3.YOUR_REGION.amazonaws.com/PREFIX --anotaciones /annotations`.
+`ink-viewer --source https://YOUR_BUCKET.s3.YOUR_REGION.amazonaws.com/PREFIX --annotations /annotations`.
 Outside Docker nothing changes: the server still listens on 127.0.0.1 unless `S3CACHE_BIND` is set.
