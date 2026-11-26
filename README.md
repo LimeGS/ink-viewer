@@ -197,11 +197,12 @@ For development, use Node 24 (CI's version), activate the Python virtual environ
 ```sh
 python -m pip install -e '.[test]'
 npm ci
+ruff check . && ruff format --check .
 python -m unittest discover -s tests/python -p 'test_*.py'
 npm test
 ```
 
-CI enforces **≥90% line coverage separately for Python and browser JavaScript**, plus dependency audits. Use the [full coverage and audit commands](docs/guide.md#run-checks) before submitting. Add meaningful tests for changed behaviour and screenshots for UI changes; also verify UI changes in a real browser, since DOM unit tests do not establish visual correctness.
+CI enforces **≥90% line coverage separately for Python and browser JavaScript**, Ruff lint and formatting for Python, plus dependency audits. Use the [full coverage and audit commands](docs/guide.md#run-checks) before submitting. Add meaningful tests for changed behaviour and screenshots for UI changes; also verify UI changes in a real browser, since DOM unit tests do not establish visual correctness.
 
 Keep code under `src/` and research data, generated reports, local settings and secrets outside Git. Preserve native image coordinates, mask ownership and calibration. Explain the problem, resulting behaviour and validation in your pull request. See [architecture and source layout](docs/architecture.md) and the [development reference](docs/guide.md#development-reference).
 
