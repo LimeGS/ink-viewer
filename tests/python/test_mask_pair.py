@@ -283,7 +283,7 @@ class MaskDecoding(unittest.TestCase):
             b"": "64 MiB",
             truncated: "PNG",
             bad_meta: "PNG",
-            png(mode="I;16"): "8 bits",
+            png(mode="I;16"): "8-bit",
         }
         for body, message in cases.items():
             with self.subTest(size=len(body)), self.assertRaisesRegex(ValueError, message):

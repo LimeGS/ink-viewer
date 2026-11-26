@@ -105,12 +105,12 @@ def sample_de(rel):
 def cargar_rollo(scroll, fuente=None):
     """Physical metadata belongs to the selected dataset; no parent checkout is required."""
     if not re.fullmatch(r"PHerc[0-9A-Za-z]+", scroll or ""):
-        raise ValueError("Identificador de rollo invalido")
+        raise ValueError("Invalid scroll identifier")
     for rel in (f"rollos/{scroll}/rollo.json", f"rollos/{scroll}.json"):
         info = fuente.indice(rel) if fuente else {}
         if info:
             if info.get("scroll") != scroll or not float(info.get("voxel_um", 0)) > 0:
-                raise ValueError("Metadatos fisicos del rollo invalidos")
+                raise ValueError("Invalid physical metadata for the scroll")
             return info
     return {"scroll": scroll, "voxel_um": None}
 
@@ -125,14 +125,14 @@ def leer_mascara(body):
     from PIL import Image, ImageChops
 
     if not 0 < len(body) <= MASK_LIMIT:
-        raise ValueError("PNG vacio o mayor a 64 MiB")
+        raise ValueError("PNG empty or over 64 MiB")
     if (
         len(body) < 33
         or body[:8] != b"\x89PNG\r\n\x1a\n"
         or body[8:16] != b"\x00\x00\x00\x0dIHDR"
         or body[24] != 8
     ):
-        raise ValueError("La mascara debe ser un PNG con profundidad de 8 bits")
+        raise ValueError("The mask must be an 8-bit PNG")
     try:
         with Image.open(io.BytesIO(body)) as image:
             if (
@@ -140,29 +140,29 @@ def leer_mascara(body):
                 or image.mode not in ("L", "LA", "P", "RGB", "RGBA")
                 or getattr(image, "n_frames", 1) != 1
             ):
-                raise ValueError("La mascara debe ser un PNG 2D de clases de 8 bits")
+                raise ValueError("The mask must be a 2D PNG of 8-bit classes")
             if image.width * image.height > MASK_PIXELS:
-                raise ValueError("Mascara mayor a 64 megapixeles")
+                raise ValueError("Mask over 64 megapixels")
             image.verify()
         with Image.open(io.BytesIO(body)) as image:
             image.load()
             raw = image.info.get(PNG_META)
             corrida = json.loads(raw) if raw else None
             if corrida is not None and not isinstance(corrida, dict):
-                raise ValueError("Metadatos PNG invalidos")
+                raise ValueError("Invalid PNG metadata")
             red, green, blue, alpha = image.convert("RGBA").split()
             if (
                 alpha.getextrema() != (255, 255)
                 or ImageChops.difference(red, green).getbbox()
                 or ImageChops.difference(red, blue).getbbox()
             ):
-                raise ValueError("La mascara debe ser opaca y gris: canales RGB identicos")
+                raise ValueError("The mask must be opaque grey: identical RGB channels")
             colors = red.getcolors(3)
             if colors is None or any(value not in (0, 255) for _, value in colors):
-                raise ValueError("Clases de mascara invalidas: solo 0 y 255")
+                raise ValueError("Invalid mask classes: only 0 and 255")
             return red, corrida
     except (OSError, SyntaxError, Image.DecompressionBombError) as e:
-        raise ValueError("PNG invalido o incompleto") from e
+        raise ValueError("Invalid or incomplete PNG") from e
 
 
 _TIFF_LOCAL = {"key": None, "path": None}
@@ -215,22 +215,22 @@ def validar_corrida(info, size, lamina, base, depth, rollo=None, recorte=None):
     if info is None:
         return
     if not isinstance(info, dict):
-        raise ValueError("Corrida debe ser un objeto JSON")
+        raise ValueError("The run must be a JSON object")
     if any(not isinstance(value, int) or isinstance(value, bool) or value <= 0 for value in size):
-        raise ValueError("Dimensiones de corrida invalidas")
+        raise ValueError("Invalid run dimensions")
     if (
         any(type(info.get(key)) is not int for key in ("ancho", "alto"))
         or (info.get("ancho"), info.get("alto")) != size
     ):
-        raise ValueError("Las dimensiones de corrida y PNG no coinciden")
+        raise ValueError("Run and PNG dimensions differ")
     if (
         info.get("segmento") != lamina
         or not isinstance(info.get("lamina"), str)
         or not info["lamina"]
     ):
-        raise ValueError("La corrida pertenece a otra lamina/segmento")
+        raise ValueError("The run belongs to another lamina/segment")
     if info.get("base") and info["base"] != base:
-        raise ValueError("La corrida pertenece a otra base")
+        raise ValueError("The run belongs to another base")
     sample = base.split("/")[1] if base.startswith("_unresolved/") else base.split("/")[0]
     if (
         rollo
@@ -240,13 +240,13 @@ def validar_corrida(info, size, lamina, base, depth, rollo=None, recorte=None):
         or info.get("scroll")
         and info["scroll"] != sample
     ):
-        raise ValueError("La corrida pertenece a otro rollo")
+        raise ValueError("The run belongs to another scroll")
     if (
         info.get("profundidad") != depth
         or depth != "max"
         and type(info.get("profundidad")) is not int
     ):
-        raise ValueError("La corrida pertenece a otra profundidad")
+        raise ValueError("The run belongs to another depth")
     # A crop mask never stands in for the whole map, nor for another crop: its window is part of its identity.
     window = info.get("recorte")
     if (
@@ -263,11 +263,11 @@ def validar_par(inkbody, supbody, info, lamina, base, depth, rollo=None, recorte
     ink, imeta = leer_mascara(inkbody)
     sup, smeta = leer_mascara(supbody)
     if ink.size != sup.size:
-        raise ValueError("Las dimensiones de inklabels y supervision_mask no coinciden")
+        raise ValueError("inklabels and supervision_mask dimensions differ")
     if ImageChops.subtract(ink, sup).getbbox():
-        raise ValueError("Hay tinta fuera de supervision_mask")
+        raise ValueError("Ink outside supervision_mask")
     if imeta != smeta or info is not None and imeta != info:
-        raise ValueError("El par PNG y su corrida no tienen los mismos metadatos")
+        raise ValueError("The PNG pair and its run have different metadata")
     corrida = info if info is not None else imeta
     validar_corrida(corrida, ink.size, lamina, base, depth, rollo, recorte)
     return corrida
@@ -278,13 +278,13 @@ def profundidad(params):
     if value == "max":
         return "max"
     if not re.fullmatch(r"[+-]?\d{1,6}", value):
-        raise ValueError("Profundidad invalida")
+        raise ValueError("Invalid depth")
     return int(value)
 
 
 def ubicacion_par(lamina, base, depth, propuesta=False, recorte=None):
     if not re.fullmatch(r"[A-Za-z0-9][\w.-]*", lamina) or ".." in lamina:
-        raise ValueError("Lamina invalida")
+        raise ValueError("Invalid lamina")
     prefix = f"catalog/{base}/labels/"
     # Each crop keeps its own pair beside the whole-map one, never on top of it.
     window = "/recorte-x{x}-y{y}-{ancho}x{alto}".format(**recorte) if recorte else ""
@@ -330,9 +330,9 @@ def labels_base(lamina, base=None, rollo=None, fuente=None):
             not re.fullmatch(r"[A-Za-z0-9][\w.-]*/segments/[A-Za-z0-9][\w.-]*", base)
             or ".." in base
         ):
-            raise ValueError("Base de segmento invalida")
+            raise ValueError("Invalid segment base")
         if rollo and base.split("/")[0] != rollo:
-            raise ValueError("La base pertenece a otro rollo")
+            raise ValueError("The base belongs to another scroll")
         return base
     rollo = rollo or SCROLL or None
     indexed = fuente.indice("lamina_labels_index.json").get(lamina)
@@ -528,13 +528,13 @@ class Handler(SimpleHTTPRequestHandler):
         global LOG_FILE
         token = getattr(self.server, "config_token", None)
         if not token or not self._host_local() or self.headers.get("X-Visor-Config") != token:
-            return self._json({"error": "Solicitud de configuracion no autorizada"}, 403)
+            return self._json({"error": "Unauthorized configuration request"}, 403)
         if self.headers.get("Origin") not in (None, "http://" + self.headers["Host"]):
-            return self._json({"error": "Origen del navegador no autorizado"}, 403)
+            return self._json({"error": "Unauthorized browser origin"}, 403)
         try:
             n = int(self.headers.get("Content-Length", 0))
             if not 0 < n <= 16384 or self.headers.get_content_type() != "application/json":
-                raise ValueError("Esperaba configuracion JSON de hasta 16 KiB")
+                raise ValueError("Expected JSON configuration up to 16 KiB")
             data = json.loads(self.rfile.read(n))
             if not isinstance(data, dict) or set(data) - {
                 "origen",
@@ -543,7 +543,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "region",
                 "anotaciones",
             }:
-                raise ValueError("Campos de configuracion invalidos")
+                raise ValueError("Invalid configuration fields")
             source = Fuente(**data)
             source.verificar()
             # Validate and persist before replacing the active source; failed changes leave it intact.
@@ -551,7 +551,7 @@ class Handler(SimpleHTTPRequestHandler):
                 current = getattr(self.server, "fuente", None)
                 if self.headers.get("X-Visor-Origen", "") != (current.id if current else ""):
                     return self._json(
-                        {"error": "El origen cambio en otra pestana; recarga el visor"}, 409
+                        {"error": "Source changed in another tab; reload the viewer"}, 409
                     )
                 if self.server.config_path:
                     guardar_json(self.server.config_path, source.config())
@@ -628,7 +628,7 @@ class Handler(SimpleHTTPRequestHandler):
         if scale not in (1, 4, 8) or not re.fullmatch(
             r"catalog/[^/]+/segments/[^/]+/ink-detection/[^/]+\.tiff?", rel, re.I
         ):
-            raise ValueError("Ruta TIFF o escala invalida")
+            raise ValueError("Invalid TIFF path or scale")
         source_rel = self.fuente.ruta_catalogo(rel)
         if recorte:
             if scale != 1:
@@ -669,7 +669,7 @@ class Handler(SimpleHTTPRequestHandler):
                 for block in iter(lambda: body.read(2**20), b""):
                     total += len(block)
                     if total > 256 * 2**20:
-                        raise ValueError("Mapa TIFF mayor a 256 MiB: genera previews PNG")
+                        raise ValueError("TIFF map over 256 MiB: generate PNG previews")
                     image_file.write(block)
             image_file.seek(0)
             with warnings.catch_warnings():
@@ -681,7 +681,9 @@ class Handler(SimpleHTTPRequestHandler):
                     or getattr(image, "n_frames", 1) != 1
                     or image.mode == "F"
                 ):
-                    raise ValueError("Se admite TIFF 2D entero; exporta los stacks o float a PNG")
+                    raise ValueError(
+                        "Only 2D integer TIFF is supported; export stacks or floating-point maps to PNG"
+                    )
                 if scale != 1:
                     image.thumbnail((max(1, image.width // scale), max(1, image.height // scale)))
                 with tempfile.SpooledTemporaryFile(max_size=8 * 2**20) as output:
@@ -1017,7 +1019,7 @@ class Handler(SimpleHTTPRequestHandler):
                     ) as (_, _, body):
                         hdr = body.read(24)
                 if len(hdr) != 24 or hdr[:8] != b"\x89PNG\r\n\x1a\n":
-                    raise ValueError("No es una cabecera PNG")
+                    raise ValueError("Not a PNG header")
                 w, h = struct.unpack(">II", hdr[16:24])
                 return self._json({"w": w, "h": h})
             if path.startswith("api/etiqueta/"):
@@ -1048,7 +1050,7 @@ class Handler(SimpleHTTPRequestHandler):
                 try:
                     data = self.fuente.indice("all-gallery/manifest.json", limite=256 * 2**20)
                     if code == 403 and not isinstance(data, list):
-                        return self.send_error(403, "S3 rechazo la lectura del manifiesto")
+                        return self.send_error(403, "S3 refused to read the manifest")
                     return self._send_bytes(
                         (
                             "window.manifest="
@@ -1065,7 +1067,7 @@ class Handler(SimpleHTTPRequestHandler):
                     b"// Optional manifest absent.\n", "application/javascript", self.fuente.tipo
                 )
             return self.send_error(
-                code, "El archivo no existe en el origen elegido" if code == 404 else str(e)
+                code, "The file does not exist in the selected source" if code == 404 else str(e)
             )
         except ValueError as e:
             return self.send_error(400, str(e))
@@ -1115,7 +1117,7 @@ class Handler(SimpleHTTPRequestHandler):
         params = parse_qs(urlsplit(self.path).query)
         rollo = params.get("rollo", [None])[0]
         if rollo and not re.fullmatch(r"PHerc[A-Za-z0-9]+", rollo):
-            raise ValueError("Rollo invalido")
+            raise ValueError("Invalid scroll")
         base = labels_base(lamina, params.get("base", [None])[0], rollo, self.fuente)
         depth = profundidad(params)
         recorte = leer_recorte(params)
@@ -1125,9 +1127,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _leer_par(self, lamina):
         if self.headers.get("X-Visor-Origen") not in (None, self.fuente.id):
-            return self._json(
-                {"error": "El origen cambio; recarga antes de importar mascaras"}, 409
-            )
+            return self._json({"error": "Source changed; reload before importing masks"}, 409)
         try:
             params, base, depth, rollo, folder, recorte = self._datos_par(lamina)
             # Canonical pairs cover whole maps; a crop only ever reads its own saved pair.
@@ -1204,10 +1204,10 @@ class Handler(SimpleHTTPRequestHandler):
                         self.send_response(204)
                         self.end_headers()
                         return
-                    return self._json({"error": "No hay par de mascaras guardado"}, 404)
+                    return self._json({"error": "No saved mask pair"}, 404)
                 if any(body is None for body in bodies):
                     return self._json(
-                        {"error": "Par incompleto: falta inklabels o supervision_mask"}, 409
+                        {"error": "Incomplete pair: inklabels or supervision_mask is missing"}, 409
                     )
                 info = validar_par(*bodies, None, lamina, base, depth, rollo, recorte)
             if params.get("metadata") == ["1"]:
@@ -1230,21 +1230,21 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length", 0))
             if self.headers.get_content_type() != "application/json" or not 0 < n <= MASK_LIMIT:
-                raise ValueError("Esperaba JSON de par de hasta 64 MiB")
+                raise ValueError("Expected pair JSON up to 64 MiB")
             data = json.loads(self.rfile.read(n))
             if not isinstance(data, dict) or set(data) - {
                 "inklabels",
                 "supervision_mask",
                 "corrida",
             }:
-                raise ValueError("Campos de par invalidos")
+                raise ValueError("Invalid pair fields")
             bodies = []
             for key in ("inklabels", "supervision_mask"):
                 if (
                     not isinstance(data.get(key), str)
                     or len(data[key]) > ((MASK_LIMIT + 2) // 3) * 4
                 ):
-                    raise ValueError("Falta PNG base64 o supera 64 MiB")
+                    raise ValueError("Base64 PNG missing or over 64 MiB")
                 bodies.append(base64.b64decode(data[key], validate=True))
             _, base, depth, rollo, folder, recorte = self._datos_par(lamina)
             info = data.get("corrida")
@@ -1255,7 +1255,7 @@ class Handler(SimpleHTTPRequestHandler):
                 or not isinstance(info.get("run_id"), str)
                 or not info["run_id"]
             ):
-                raise ValueError("El par requiere corrida con run_id y par_id")
+                raise ValueError("The pair needs a run with run_id and par_id")
             orientation = info.get("orientacion")
             correction = orientation.get("correccion") if isinstance(orientation, dict) else None
             if (
@@ -1269,12 +1269,12 @@ class Handler(SimpleHTTPRequestHandler):
                     or any(type(v) is not int or v not in (0, 1) for v in correction)
                 )
             ):
-                raise ValueError("El par requiere cara y orientacion explicitamente registradas")
+                raise ValueError("The pair needs explicitly recorded face and orientation")
             if "base" not in info:
-                raise ValueError("El par requiere base de origen registrada")
+                raise ValueError("The pair needs a recorded source base")
             info = validar_par(*bodies, info, lamina, base, depth, rollo, recorte)
             if not leer_mascara(bodies[1])[0].getbbox():
-                raise ValueError("No se guarda un par sin pixeles supervisados")
+                raise ValueError("A pair without supervised pixels is not saved")
             directories = [ubicacion_par(lamina, base, "max", recorte=recorte), folder]
             files = dict(zip((lamina + "_inklabels.png", lamina + "_supervision_mask.png"), bodies))
             if info is not None:
@@ -1324,18 +1324,16 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._host_local():
             return self.send_error(403)
         if self.headers.get("Origin") not in (None, "http://" + self.headers["Host"]):
-            return self._json({"error": "Origen del navegador no autorizado"}, 403)
+            return self._json({"error": "Unauthorized browser origin"}, 403)
         if not self.fuente:
             return self._json({"error": NO_SOURCE}, 503)
         if self.headers.get("X-Visor-Origen") != self.fuente.id:
             return self._json(
-                {"error": "Origen distinto o pestana desactualizada; recarga antes de guardar"},
+                {"error": "Different source or outdated tab; reload before saving"},
                 409,
             )
         if not self.fuente.anotaciones:
-            return self._json(
-                {"error": "Origen de solo lectura: configura una carpeta de anotaciones"}, 403
-            )
+            return self._json({"error": "Read-only source: configure an annotation folder"}, 403)
         if path.startswith("api/mascara-par/"):
             return self._guardar_par(path[len("api/mascara-par/") :])
         if path == "api/inksdk/trabajos":
@@ -1365,11 +1363,11 @@ class Handler(SimpleHTTPRequestHandler):
             not re.fullmatch(r"[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*\.(png|json)", rel)
             or ".." in rel
         ):
-            return self.send_error(400, "esperaba <lamina>/<archivo>.png o .json")
+            return self.send_error(400, "Expected <lamina>/<file>.png or .json")
         try:
             n = int(self.headers.get("Content-Length", 0))
             if not 0 < n <= MASK_LIMIT:
-                raise ValueError("Cuerpo vacio o mayor a 64 MiB")
+                raise ValueError("Body empty or over 64 MiB")
             body = self.rfile.read(n)
             lamina, name = rel.split("/")
             _, base, depth, rollo, folder, recorte = self._datos_par(lamina)
@@ -1381,7 +1379,7 @@ class Handler(SimpleHTTPRequestHandler):
             else:
                 info = json.loads(body)
                 if not isinstance(info, dict):
-                    raise ValueError("JSON de corrida invalido")
+                    raise ValueError("Invalid run JSON")
                 # A lone sidecar must bind the destination too; complete PNG geometry is checked by the pair endpoint.
                 validar_corrida(
                     info, (info.get("ancho"), info.get("alto")), lamina, base, depth, rollo
@@ -1391,7 +1389,7 @@ class Handler(SimpleHTTPRequestHandler):
                 claves.append(folder.removeprefix("catalog/") + "/" + name)
             if name.endswith(("_inklabels.png", "_supervision_mask.png", "_mascara_corrida.json")):
                 return self._json(
-                    {"error": "Los miembros de un par se guardan juntos: usa /api/mascara-par"}, 409
+                    {"error": "Pair members are saved together: use /api/mascara-par"}, 409
                 )
             if any(
                 (
@@ -1401,7 +1399,7 @@ class Handler(SimpleHTTPRequestHandler):
             ):
                 return self._json(
                     {
-                        "error": "Esta mascara pertenece a un par: usa /api/mascara-par para conservar la transaccion"
+                        "error": "This mask belongs to a pair: use /api/mascara-par to keep the transaction"
                     },
                     409,
                 )
@@ -1453,15 +1451,13 @@ def main():
     ap.add_argument(
         "--scroll",
         default=os.environ.get("SCROLL"),
-        help="opcional: fija el default de este proxy; sin el sirve todos los rollos",
+        help="default scroll when a request names none",
     )
-    ap.add_argument(
-        "--port", type=int, default=PORT, help="puerto (S3CACHE_PORT; 8797 por defecto)"
-    )
+    ap.add_argument("--port", type=int, default=PORT, help="port (S3CACHE_PORT; default 8797)")
     ap.add_argument(
         "--dry-run",
         action="store_true",
-        help="imprime lo resuelto (JSON) y sale sin abrir el puerto ni tocar la red",
+        help="print the resolved settings (JSON) and exit, without opening the port or touching the network",
     )
     ap.add_argument(
         "--origen",
@@ -1487,10 +1483,10 @@ def main():
     ap.add_argument(
         "--s3-endpoint",
         default=os.environ.get("VISOR_S3_ENDPOINT", ""),
-        help="endpoint HTTP/HTTPS de un S3 compatible, por ejemplo MinIO",
+        help="HTTP/HTTPS endpoint of an S3-compatible store, e.g. MinIO",
     )
     ap.add_argument(
-        "--s3-region", default=os.environ.get("VISOR_S3_REGION", ""), help="region del origen S3"
+        "--s3-region", default=os.environ.get("VISOR_S3_REGION", ""), help="region of the S3 source"
     )
     ap.add_argument(
         "--ct-origen",
@@ -1511,7 +1507,7 @@ def main():
         default=os.environ.get(
             "VISOR_CONFIG", str(Path.home() / ".config/vesuvius-visor/config.json")
         ),
-        help="archivo JSON que recuerda el origen elegido desde el visor",
+        help="JSON file that remembers the source chosen in the viewer",
     )
     a = ap.parse_args()
     config_path = Path(a.config).expanduser().resolve()
@@ -1556,7 +1552,8 @@ def main():
     if source:
         source.verificar()
         log(
-            f"arrancando en :{PORT}; origen {source.tipo}: {source.origen}; anotaciones: {source.anotaciones or 'solo lectura'}"
+            f"starting on :{PORT}; source {source.tipo}: {source.origen}; "
+            f"annotations: {source.anotaciones or 'read-only'}"
         )
     else:
         log(f"starting on :{PORT} with no source; choose one in the viewer (Change source)")
@@ -1569,7 +1566,7 @@ def main():
             srv.hf_sync = HFSync(a.annotations_hf)
         except Exception as e:
             ap.error("--annotations-hf: " + str(e))
-        log(f"anotaciones espejadas en https://huggingface.co/datasets/{a.annotations_hf}")
+        log(f"annotations mirrored to https://huggingface.co/datasets/{a.annotations_hf}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
