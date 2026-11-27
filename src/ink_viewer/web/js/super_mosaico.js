@@ -106,10 +106,19 @@
   $('superProf').oninput=e=>{prof=+e.target.value;$('superProfV').textContent=(prof>0?'+':'')+prof;fuentes();pedir()};
   grid.addEventListener('wheel',e=>{e.preventDefault();z=Math.max(.05,Math.min(8,z*Math.exp(-Math.max(-100,Math.min(100,e.deltaY))*.004)));pedir()},{passive:false});
   grid.addEventListener('scroll',pedir,{passive:true});
-  grid.onpointerdown=e=>{if(e.button!==0)return;drag={x:e.clientX,y:e.clientY,m:0};grid.setPointerCapture(e.pointerId);grid.classList.add('drag')};
-  grid.onpointermove=e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;drag.m+=Math.abs(dx)+Math.abs(dy);cx-=dx/z;cy-=dy/z;pedir()};
-  grid.onpointerup=e=>{const m=drag?drag.m:99;drag=null;grid.classList.remove('drag');
-   };
+  grid.onpointerdown=e=>{if(e.button===0)drag={x:e.clientX,y:e.clientY,pointer:e.pointerId,active:false}};
+  grid.onpointermove=e=>{
+   if(!drag||drag.pointer!==e.pointerId)return;
+   const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+   if(!drag.active){
+    if(Math.abs(dx)+Math.abs(dy)<4)return;
+    grid.setPointerCapture(e.pointerId);grid.classList.add('drag');drag.active=true;
+   }
+   drag.x=e.clientX;drag.y=e.clientY;cx-=dx/z;cy-=dy/z;pedir();
+  };
+  const stopDrag=e=>{if(drag?.pointer===e.pointerId){drag=null;grid.classList.remove('drag')}};
+  grid.onpointerup=grid.onpointercancel=stopDrag;
+  grid.onpointerleave=e=>{if(!drag?.active)stopDrag(e)};
   grid.ondblclick=e=>{const t=e.target.closest('.sup');if(t)principal(+t.dataset.i)};
   grid.oncontextmenu=e=>{const t=e.target.closest('.sup');if(!t)return;e.preventDefault();menu(e.clientX,e.clientY,+t.dataset.i)};
   document.addEventListener('keydown',tecla);pedir()}
