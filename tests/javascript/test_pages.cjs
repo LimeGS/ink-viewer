@@ -117,6 +117,26 @@ test('unindexed S3 prefix consumes every result page and preserves encoded image
   } finally { w.close(); }
 });
 
+test('Label on a TIFF preview picks a crop and requests its native grid', async () => {
+  const file = 'PHerc123/segments/segment/ink-detection/map.tif';
+  const w = await open('official', {[page + 'official.json']: {root: root.slice(0,-1), entries, previews: {[file]: 'small.jpg'}}}, undefined, true);
+  try {
+    let choosing = false;
+    const tool = {state: {crop: null}, choose() { choosing = true; }};
+    w.recorteVista = tool;
+    const viewer = w.VISOR_STATIC;
+    assert.equal(viewer.select(frame, 'fixed').preview, true);
+    viewer.prepareLabel();
+    assert.equal(choosing, true);
+    assert.equal(viewer.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
+    tool.state.crop = {original: root + file, x:1024, y:2048, ancho:2048, alto:2048};
+    assert.equal(viewer.select(frame, 'fixed').preview, false);
+    const route = new URL(viewer.mapUrl(frame, 'fixed'));
+    assert.equal(route.searchParams.get('crop'), '1024,2048,2048,2048');
+    assert.equal(viewer.mapUrl(frame, 'fixed', 8), root + 'small.jpg?viewer=cors');
+  } finally { w.close(); }
+});
+
 test('Label switches the published comparison to the native style A grid', async () => {
   const preview = 'https://huggingface.co/datasets/test/resolve/main/entry/preview.jpg';
   const w = await open('ink-labels', {[page + 'ink-labels.json']: {root, entries}}, undefined, true);

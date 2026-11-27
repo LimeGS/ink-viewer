@@ -172,10 +172,10 @@ function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThi
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
   im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=staticMap?.original||loader.src;
   $('notice').hidden=false;$('notice').textContent=staticMap?(staticMap.caption||'Published preview · browse only. Open the original TIFF for its native grid.'):'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
-  if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
+  if(globalThis.recorteVista)globalThis.recorteVista.reduced(!staticMap||VISOR_STATIC.cropTarget?{url,w:W,h:H,original:staticMap?.original}:null);im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
  if(staticMap?.preview){loader.reduced=true;loader.onload=reduced}
  loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);
-  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true);loader.src=mapUrl(dir,$('contrast').value,4);return}
+  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true,!!VISOR_STATIC.cropTarget);loader.src=mapUrl(dir,$('contrast').value,4);return}
   if(staticMap){cargandoOff();im.hidden=true;$('download').href=staticMap.original;$('notice').textContent='Cannot display this map. Check browser access (CORS), or open the original file.';return}
   cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
 }
