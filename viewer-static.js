@@ -654,10 +654,10 @@ const catalogTotalSeries=manifest.length;
    Explicit preferences and deep links still control whether unverified maps are shown. */
 /* 25-sep: &sinverificar=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
 function mostrarSinVerificar(entries,source,saved,hash){
- const fallback=!!source&&entries.some(g=>g.catalogMeta)&&!entries.some(hasVerifiedMeshAssociation);
+ const fallback=!!source&&(globalThis.VISOR_STATIC||entries.some(g=>g.catalogMeta))&&!entries.some(hasVerifiedMeshAssociation);
  return hash==='1'||(saved!==null?saved==='1':fallback);
 }
-const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem('vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
+const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
 manifest.splice(0,manifest.length,...manifest.filter(g=>hasVerifiedMeshAssociation(g)||SIN_VERIFICAR&&Object.keys(g.frames||{}).length));
 const $=id=>document.getElementById(id), vp=$('viewport'), im=$('map'), slider=$('depth'), stage=$('stage');
 let group,zoom=1,x=0,y=0,fitted=true,projection=false,request=0,drag=null,fullresReady=0,fullresGroup=null,fullresDepth=null,maskReady=false;
@@ -760,14 +760,14 @@ function ensureContrast(){for(const o of $('contrast').options){o.dataset.origin
 function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThis.recorteVista.showing();if(pintar)release();if(!group.catalogMeta)for(const o of $('contrast').options)o.disabled=false;ensureContrast();let n=Number(slider.value),dir=projection?group.maximum:group.frames[n];$('offset').value=projection?'Max.':group.catalogMeta?.depthKnown===false?'Map':signed(n);pintarBanda(n);syncHash();if(projection){const o=group.maximumOffsets||[];$('projection').textContent='Maximum '+(o.length?signed(Math.min(...o))+'…'+signed(Math.max(...o)):'across depths')+' · can merge strokes from different sheets or artefacts.'}$('prev').disabled=projection||n<=Number(slider.min);$('next').disabled=projection||n>=Number(slider.max);slider.disabled=projection||group.catalogMeta?.depthKnown===false;$('projection').hidden=!projection;$('max').classList.toggle('active',projection);$('max').setAttribute('aria-pressed',String(projection));let token=++request;fullresReady=0;$('notice').hidden=false;im.style.opacity='.3';
  if(!dir){$('notice').textContent='This centre is not available yet';im.hidden=true;$('download').removeAttribute('href');return}
  const staticMap=globalThis.VISOR_STATIC?.select(dir,$('contrast').value);
- const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();loader.crossOrigin='anonymous';
+ const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();loader.crossOrigin='anonymous';loader.fetchPriority='high';
  loader.onload=()=>{if(token!==request)return;if(globalThis.recorteVista)globalThis.recorteVista.reduced(null);let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=staticMap?.original||url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px'+(globalThis.recorteVista?globalThis.recorteVista.title():'');if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
  /* 24-nov: a TIFF map too large for full resolution in a browser (official whole segments reach gigapixels) opens as a
     reduced, browse-only view: the 1/4 map, or the published 1/8 JPEG. fullresReady stays 0, so labeling stays locked. */
  const reduced=()=>{if(token!==request)return;const W=loader.naturalWidth,H=loader.naturalHeight,changed=im.naturalWidth!==W||im.naturalHeight!==H;
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
   im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=staticMap?.original||loader.src;
-  $('notice').hidden=false;$('notice').textContent=staticMap?'Published preview · browse only. Open the original TIFF for its native grid.':'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
+  $('notice').hidden=false;$('notice').textContent=staticMap?(staticMap.caption||'Published preview · browse only. Open the original TIFF for its native grid.'):'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
   if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
  if(staticMap?.preview){loader.reduced=true;loader.onload=reduced}
  loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);
@@ -2614,7 +2614,7 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   const key=Object.values(g.frames).join('|')+'|'+$('contrast').value;if(POOL.id!==key){poolLimpiar();POOL.id=key}
   const near=vecinos(g);
   Object.keys(POOL.imgs).forEach(c=>{if(!near.includes(+c)){POOL.imgs[c].remove();delete POOL.imgs[c];if(POOL.activo===+c)poolOcultar()}});
-  near.forEach(c=>{if(POOL.imgs[c])return;const e=document.createElement('img');e.className='poolImg';e.decoding='async';e.draggable=false;
+  near.forEach(c=>{if(POOL.imgs[c])return;const e=document.createElement('img');e.crossOrigin='anonymous';e.className='poolImg';e.decoding='async';e.draggable=false;
    e.style.cssText='position:absolute;left:0;top:0;max-width:none;user-select:none;pointer-events:none;visibility:hidden;filter:var(--fx)';
    e.src=urlDe(g.frames[c]);e.dataset.c=String(c);POOL.imgs[c]=e;e.decode().then(()=>{e.dataset.ok='1'}).catch(()=>{});im.after(e)})}
  function poolMostrar(c){const e=POOL.imgs[c];if(!e||e.dataset.ok!=='1'){poolOcultar();return false}
@@ -2627,13 +2627,13 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  window.precargaPool=()=>({id:POOL.id,decodificadas:Object.values(POOL.imgs).filter(e=>e.dataset.ok==='1').length,activo:POOL.activo});
  /* ---- low-res preview: <dir>/fixed_lo.jpg (1/4 scale JPEG, ~30 KB, all of them cached on the Mac) shown at once
     while the full-res PNG loads; hidden as soon as the full image (or the pool frame) is up. ---- */
- const lo=document.createElement('img');lo.id='lowres';lo.decoding='async';lo.draggable=false;
+ const lo=document.createElement('img');lo.crossOrigin='anonymous';lo.id='lowres';lo.decoding='async';lo.draggable=false;
  lo.style.cssText='position:absolute;left:0;top:0;max-width:none;user-select:none;pointer-events:none;visibility:hidden;filter:var(--fx);image-rendering:auto';
  im.before(lo);
  /* tiered: 1/8 first (~10 KB), then 1/4 once it is decoded, then the HD png hides both */
  lo.onload=()=>{if(lo.dataset.for!==im.src)return;const f=/(_lo8|-ds8)\.jpg$/.test(lo.src)?8:4;lo.style.width=(lo.naturalWidth*f)+'px';lo.style.height=(lo.naturalHeight*f)+'px';
   if(!(im.complete&&im.naturalWidth)&&POOL.activo==null)lo.style.visibility='';
-  if(f===8){const u4=lo.src.replace(/_lo8\.jpg$/,'_lo.jpg').replace(/-ds8\.jpg$/,'-ds4.jpg'),pre=new Image();pre.onload=()=>{if(lo.dataset.for===im.src&&lo.style.visibility!=='hidden')lo.src=u4};pre.src=u4}};
+  if(f===8){const u4=lo.src.replace(/_lo8\.jpg$/,'_lo.jpg').replace(/-ds8\.jpg$/,'-ds4.jpg'),pre=new Image();pre.crossOrigin='anonymous';pre.onload=()=>{if(lo.dataset.for===im.src&&lo.style.visibility!=='hidden')lo.src=u4};pre.src=u4}};
  lo.onerror=()=>{if(/(_lo8|-ds8)\.jpg$/.test(lo.src)){lo.src=lo.src.replace(/_lo8\.jpg$/,'_lo.jpg').replace(/-ds8\.jpg$/,'-ds4.jpg');return}lo.style.visibility='hidden'};
  const loMostrar=()=>{if(!im.src||im.src.startsWith('blob:')){lo.style.visibility='hidden';return}
   const u=previewOf(im.src,8);if(!u)return;lo.dataset.for=im.src;lo.style.visibility='hidden';lo.src=u};
@@ -2872,7 +2872,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  ctl.forEach(([id,k,t])=>{const e=$(id);e.oninput=()=>{F[k]=t==='bool'?e.checked:e.value;pintar()}});$('xpDir').onclick=()=>{F.desc=!F.desc;pintar()};
  bThumb.onclick=()=>{F.thumbs=!F.thumbs;save();armarFlat();$('xpList').scrollTop=0;pintarVentana();sync()};
  window.xpRepintar=()=>pintar();
- const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem('vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
+ const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
  function sync(){ctl.forEach(([id,k,t])=>{const e=$(id);if(t==='bool')e.checked=!!F[k];else if(document.activeElement!==e)e.value=F[k];if(t==='num')e.classList.toggle('on',F[k]!=='')});syncView();$('xpDir').textContent=F.desc?'↓':'↑';$('xpDir').title=F.desc?'Descending — reverse sort':'Ascending — reverse sort';activeFilters();bThumb.classList.toggle('on',!!F.thumbs);bThumb.setAttribute('aria-pressed',String(!!F.thumbs))}
  let ROWS=[],VIS=[],FLAT=[],LABS=new Set();const ABIERTAS=new Set();
  /* 24-sep: a segment row unfolds into its maps (one per lamina x model x face), the segment's own maps first */
@@ -2934,10 +2934,10 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
     '<span class="num">'+(r.cm!=null?r.cm.toFixed(2):'—')+'</span><span class="num" title="v5 legibility'+(r.v5c!=null?' @c'+r.v5c:'')+(r.v5m?' · '+r.v5m:'')+(r.v5p!=null?' · p'+r.v5p.toFixed(1)+' within scroll and model':'')+'">'+(r.v5==null?'—':F.v5m==='pct'?'p'+r.v5p.toFixed(1):r.v5.toFixed(3))+'</span>'+marca(r);
    d.title=meshTooltip(r.e.items);d.querySelector('.n').title+='\n'+d.title;
    if(F.thumbs){const first=thumbDe(r),base=thumbDe(r,/base/i),thumbs=[first,...(base&&base.u!==first?.u?[base]:[])].filter(Boolean),box=document.createElement('div');box.className='thumbs';d.append(box);thumbs.forEach(t=>{if(t.u){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=modCorto(t.m)+' · c'+(+t.c>=0?'+':'')+t.c;figure.append(caption);box.append(figure);const im=document.createElement('img');im.className='th';im.alt=modCorto(t.m)+' preview';im.decoding='async';im.tabIndex=0;
-    im.title=modCorto(t.m)+' \u00b7 c'+(+t.c>=0?'+':'')+t.c+' \u00b7 preview';im.loading='lazy';im.fetchPriority='low';im.src=t.u;
+    im.title=modCorto(t.m)+' \u00b7 c'+(+t.c>=0?'+':'')+t.c+' \u00b7 preview';im.crossOrigin='anonymous';im.loading='lazy';im.fetchPriority='low';im.src=t.u;
     im.onerror=()=>{if(t.fallback&&im.src!==t.fallback){im.src=t.fallback;t.zoom=t.fallback}
       else im.style.visibility='hidden'};
-    im.onmouseenter=im.onfocus=()=>{let z=$('xpZoom');if(!z){z=document.createElement('img');z.id='xpZoom';z.alt='';
+    im.onmouseenter=im.onfocus=()=>{let z=$('xpZoom');if(!z){z=document.createElement('img');z.crossOrigin='anonymous';z.id='xpZoom';z.alt='';
      z.style.cssText='position:fixed;z-index:9999;max-width:min(62vw,900px);max-height:86vh;border:1px solid #2d8a6d;background:#05080c;box-shadow:0 8px 30px #000a;pointer-events:none';
      z.onerror=()=>{z.hidden=true};document.body.append(z)}const b=im.getBoundingClientRect();z.src=t.zoom;
      z.style.left=Math.max(8,Math.min(b.right+12,innerWidth-Math.min(innerWidth*.62,900)-8))+'px';
