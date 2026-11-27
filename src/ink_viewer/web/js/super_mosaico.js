@@ -35,6 +35,7 @@
    .forEach(([t,fx])=>add('Extremes',t,fx));
   // Put the presets that preserve readable strokes before the more aggressive experiments.
   const readingOrder = [
+   'sobel inv', 'iso4', 'iso8 turbo', 'iso6 DoG8', 'relief turbo', 'lap inv S20',
    'raw · p2', 'raw · S k8 · viridis', 'raw · S k30 c.35 · magma', 'raw · post5 · diverge',
    'unsharp3 r12 · p2', 'unsharp3 r12 · S k8 · viridis', 'unsharp3 r12 · S k30 c.35 · magma',
    'unsharp3 r12 · post5 · diverge', 'post8 magma S8', 'contrast4',

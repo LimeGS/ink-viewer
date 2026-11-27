@@ -119,7 +119,9 @@ test('filters, source dialog and Super mosaic retain usable UI state',async()=>{
   click(w,'superBtn');await settle();
   assert(w.superDebug().V>80);assert(w.document.querySelectorAll('#superGrid .sup').length>80);
   const titles = [...w.document.querySelectorAll('#superGrid .sup span')].map(tile => tile.textContent);
-  assert.deepEqual(titles.slice(0,3), ['raw · p2', 'raw · S k8 · viridis', 'raw · S k30 c.35 · magma']);
+  assert.deepEqual(titles.slice(0, 7), [
+   'sobel inv', 'iso4', 'iso8 turbo', 'iso6 DoG8', 'relief turbo', 'lap inv S20', 'raw · p2',
+  ]);
   assert(titles.indexOf('hot S8') < titles.findIndex(name => name.startsWith('PA6')));
   input(w,'superTam','220','change');input(w,'superProf','2');click(w,'superMax');
   click(w,'superVF');click(w,'superVC');w.superDibujar();
