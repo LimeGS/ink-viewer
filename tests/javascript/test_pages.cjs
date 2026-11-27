@@ -83,6 +83,7 @@ test('source picker exposes the presets and asks for a path only in custom mode'
     const select = w.document.querySelector('header select'), input = w.document.querySelector('header input');
     assert.deepEqual(Array.from(select.options, o => o.value), ['official', 'ink-labels', 'custom']);
     assert.equal(select.value, 'ink-labels');
+    assert.equal(select.selectedOptions[0].textContent, 'VSKinox Label Collection');
     assert(input.hidden);
     select.value = 'custom'; select.dispatchEvent(new w.Event('change'));
     assert(!input.hidden && input.required);
