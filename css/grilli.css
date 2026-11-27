@@ -1,0 +1,223 @@
+/* Grilli Security UI palette, verified against grillisecurity.com.
+   Scientific images, mask encodings and user-selected overlay colours are untouched. */
+:root{
+ --grilli-bg:#0e1814;
+ --grilli-panel:#15211c;
+ --grilli-raised:#1e2c26;
+ --grilli-input:#101b16;
+ --grilli-text:#e8dec5;
+ --grilli-muted:#9a9382;
+ --grilli-border:#35453a;
+ --grilli-control-border:#566550;
+ --grilli-sage:#84b095;
+ --grilli-selected:#263e30;
+ --grilli-gold:#b89a5a;
+ --grilli-gold-hover:#cdb16f;
+ --grilli-warning:#dfc17f;
+ --grilli-danger:#eda59a;
+ --grilli-danger-bg:#382421;
+ --grilli-font:Inter,system-ui,sans-serif;
+}
+html body{background:var(--grilli-bg);color:var(--grilli-text);font-family:var(--grilli-font);-webkit-font-smoothing:antialiased;scrollbar-color:var(--grilli-control-border) var(--grilli-bg)}
+html body ::selection{background:#b89a5a40;color:var(--grilli-text)}
+html body>header{background:var(--grilli-bg);border-color:var(--grilli-border);gap:12px}
+html body .grilliBrand{display:flex;align-items:center;flex:none;gap:12px;font-weight:600;font-size:13px}
+html body .grilliBrand img{display:block;width:auto;height:24px}
+html body .grilliBrand .viewerName{padding-left:12px;border-left:1px solid var(--grilli-border)}
+html body .grilliBrand .muted{font-size:11px;font-weight:400}
+html body .toolbar,html body .depth,html body footer{background:var(--grilli-panel);border-color:var(--grilli-border)}
+html body .toolbar .tbg,html body .separator,html body #filtros .sep{border-color:var(--grilli-border)}
+html body .separator,html body #filtros .sep{background:var(--grilli-border)}
+html body button,html body select,html body input:not([type=range]):not([type=checkbox]):not([type=color]),html body textarea,html body .mods>summary{
+ font-family:var(--grilli-font);background:var(--grilli-raised);color:var(--grilli-text);border-color:var(--grilli-control-border);border-radius:4px;
+}
+html body button,html body .mods>summary{font-weight:500}
+html body button:hover,html body .mods>summary:hover{background:#2c3c30;border-color:var(--grilli-sage)}
+html body button:focus-visible,html body select:focus-visible,html body input:focus-visible,html body textarea:focus-visible,html body a:focus-visible,html body summary:focus-visible{
+ outline:2px solid var(--grilli-gold-hover);outline-offset:2px;
+}
+html body input[type=range],html body input[type=checkbox],html body #filtros input[type=range],html body #filtros input[type=checkbox],html body #origenForm input[type=checkbox],html body #modsList .modrow>input[type=checkbox]{accent-color:var(--grilli-sage)}
+html body a,html body #fxDestinoTxt,html body #filtros output,html body #bandasCfg output{color:var(--grilli-sage)}
+html body .muted,html body #count,html body #banda,html body #bEstado,html body #fEstado,html body #panel h3,html body #htIntMapas,html body #htEstado,html body #htCorridaEst{color:var(--grilli-muted)}
+html body button.on,html body button.active,html body .mods[open]>summary,html body #htSec .htSeg button.on,html body #fxPresets button.on,html body #etapasFiltro button.on{
+ background:var(--grilli-selected);border-color:var(--grilli-sage);color:var(--grilli-text);
+}
+html body button.on.rojo{background:var(--grilli-danger-bg);border-color:var(--grilli-danger)}
+html body #etiq.active,html body #exp,html body #guardarMascaraServidor:not(:disabled),html body #origenAplicar,html body #htConfSi{
+ background:var(--grilli-gold);border-color:var(--grilli-gold);color:#1a1410;
+}
+html body #etiq.active:hover,html body #exp:hover,html body #guardarMascaraServidor:not(:disabled):hover,html body #origenAplicar:hover,html body #htConfSi:hover{
+ background:var(--grilli-gold-hover);border-color:var(--grilli-gold-hover);
+}
+html body #arbol,html body #panel,html body #filtros,html body #bandasCfg,html body #modsList,html body #modsBuscarWrap{background:var(--grilli-bg);border-color:var(--grilli-border)}
+html body #buscar,html body #modsBuscar,html body #anilloR,html body #ta,html body #xp input[type=text],html body #xp input[type=number],html body #xp input[type=search],html body #xp select,html body #vista select,html body #panel select,html body #bandasCfg input[type=number]{background:var(--grilli-input);color:var(--grilli-text);border-color:var(--grilli-control-border)}
+html body #xp{font-family:var(--grilli-font);color:var(--grilli-text)}
+html body #vista label,html body #xpOrder label,html body #xp legend,html body #xp .xpFields label,html body #xpTally caption,html body #xpTally thead,html body #panel .labelFormat,html body #labelFooter small{color:var(--grilli-muted)}
+html body #xp details,html body #labelSections>details,html body #fxDestino{background:var(--grilli-panel);border-color:var(--grilli-border);border-radius:4px}
+html body #xp summary,html body #labelSections summary,html body #filtros label{color:var(--grilli-text)}
+html body #xp summary:hover,html body #labelSections summary:hover,html body .modrow:hover,html body #tree summary:hover,html body #tree .lam:hover{background:var(--grilli-raised)}
+html body #xp .pre,html body #xp .xpBadge{background:var(--grilli-raised);border-color:var(--grilli-control-border);color:var(--grilli-text)}
+html body #xp .xpBadge.pass,html body #xp input.on,html body #xp select.pass,html body #xp select.yes{background:var(--grilli-selected);border-color:var(--grilli-sage);color:#a4c8b2}
+html body #xp .xpBadge.fail,html body #xp select.fail{background:var(--grilli-danger-bg);border-color:#b97567;color:var(--grilli-danger)}
+html body #xp select.unm{background:var(--grilli-raised);border-color:var(--grilli-muted);color:var(--grilli-text)}
+html body #xpHead,html body #labelHeader,html body #labelFooter,html body #filtros #fxHeader{background:var(--grilli-panel);border-color:var(--grilli-border)}
+html body #xpHead,html body #xpList .r.sub,html body #xpList .thumbs figcaption{color:var(--grilli-muted)}
+html body #xpList,html body #xpList .r,html body #xpResults,html body #xpTally thead,html body #labelBrush,html body #panel #labelJson,html body #panel #htPend,html body #labelWarnings,html body #filtros #fxBar{border-color:var(--grilli-border)}
+html body #xpList .r:hover{background:var(--grilli-raised)}
+html body #xp .lbl{opacity:1;color:var(--grilli-muted)}
+html body #xpList .r.sel,html body #tree .lam.sel{background:var(--grilli-selected);outline-color:var(--grilli-sage);border-color:var(--grilli-sage)}
+html body #xpList .g b,html body #xpTally .p,html body #tree .pares .si{color:#a4c8b2}
+html body #xpList .g s,html body #xpTally .f,html body #tree .pares .no{color:var(--grilli-danger)}
+html body #xpList .g u,html body #xpTally .u,html body #tree .pares i{color:var(--grilli-muted)}
+html body #xpList .tg,html body #xpFilterCount,html body #etapasVisible,html body #xp .lnk{color:var(--grilli-sage)}
+html body #xpList .star{color:var(--grilli-muted)}
+html body #xpList .star.on{color:var(--grilli-warning)}
+html body #tree summary,html body #tree>details>summary,html body #tree .pares b,html body #etapasInfo b{color:var(--grilli-text)}
+html body #tree details details,html body #tree .pares{border-color:var(--grilli-border)}
+html body #tree details details>summary,html body #tree .lam small,html body #tree .pares,html body #leyendaContam,html body #etapasInfo{color:var(--grilli-muted)}
+html body #tree .pares{background:var(--grilli-panel)}
+html body #panel #labelModes button[aria-pressed=true]{outline-color:var(--grilli-warning)}
+html body #panel #stats,html body #htCorrida{color:var(--grilli-text)}
+html body #panel #msg,html body #panel #htPend,html body #labelWarnings{color:var(--grilli-warning)}
+html body #htVarita.on,html body #htMarcar.on,html body #oriAuto.corr,html body #oriMarca,html body .pane .om,html body .pane .pact button.on,html body #htPrevBox{
+ background:#332c1c;border-color:var(--grilli-gold);color:var(--grilli-warning);
+}
+html body #oriAuto.orig,html body #htConf{background:var(--grilli-danger-bg);border-color:#b97567;color:var(--grilli-danger)}
+html body #htAplicar:not(:disabled){background:var(--grilli-selected);border-color:var(--grilli-sage);color:var(--grilli-text)}
+html body #htMeta .htFila span:first-child{color:var(--grilli-muted)}
+html body #htMeta .htOk,html body #htMeta .htOk span:first-child{color:#a4c8b2}
+html body #htMeta .htBarra{background:var(--grilli-raised)}
+html body #htMeta .htBarra i{background:var(--grilli-gold)}
+html body #htMeta .htBarra.ok i{background:var(--grilli-sage)}
+html body #filtros #fxTabs button{background:transparent;border-color:transparent;color:var(--grilli-muted)}
+html body #filtros #fxTabs button[aria-selected=true]{background:var(--grilli-selected);border-color:var(--grilli-sage);color:var(--grilli-text)}
+html body #filtros #uiModo{border-color:var(--grilli-control-border)}
+html body #filtros #uiModo button{background:var(--grilli-raised);color:var(--grilli-muted)}
+html body #filtros #uiModo button.on{background:var(--grilli-selected);color:var(--grilli-text)}
+html body #modsList .vacio,html body #modsList .pie,html body #fxDestino small{color:var(--grilli-muted)}
+html body #modsList .pie{border-color:var(--grilli-border)}
+html body #modsList .cont{color:var(--grilli-warning)}
+html body #bandas{background:var(--grilli-raised);border-color:var(--grilli-border)}
+html body #depth::-webkit-slider-thumb{background:var(--grilli-text);border-color:var(--grilli-bg);box-shadow:0 0 0 1px var(--grilli-sage)}
+html body #depth::-moz-range-thumb{background:var(--grilli-text);border-color:var(--grilli-bg)}
+html body .pane .et,html body .pane .pact button,html body .pane .tb button{background:#0e1814e6;border-color:var(--grilli-control-border);color:var(--grilli-sage)}
+html body .pane .et:hover,html body .pane .pact button:hover{background:var(--grilli-raised);border-color:var(--grilli-sage)}
+html body #notice{background:#15211cf2;border-color:var(--grilli-control-border);color:var(--grilli-text)}
+html body #projection{background:#332c1cf2;color:var(--grilli-warning)}
+html body #super{background:var(--grilli-bg);color:var(--grilli-text);font-family:var(--grilli-font)}
+html body #superBar{background:var(--grilli-panel);border-color:var(--grilli-border)}
+html body #superBar button,html body #superBar select{background:var(--grilli-raised);border-color:var(--grilli-control-border);color:var(--grilli-text)}
+html body #superBar button.on{background:var(--grilli-selected);border-color:var(--grilli-sage);color:var(--grilli-text)}
+html body .sup{border-color:var(--grilli-border)}
+html body .sup:hover{border-color:var(--grilli-sage)}
+html body .sup .cel i,html body .sup span{background:#0e1814e6;color:var(--grilli-sage)}
+html body #origenDialog{background:var(--grilli-panel);border-color:var(--grilli-control-border);border-radius:6px;box-shadow:0 20px 70px #0008}
+html body #origenForm input,html body #origenForm select{background:var(--grilli-input);border-color:var(--grilli-control-border);color:var(--grilli-text)}
+html body #origenError{color:var(--grilli-danger)}
+html body .spin .ring{border-color:var(--grilli-border);border-top-color:var(--grilli-sage);box-shadow:0 0 0 6px #0e1814aa}
+html body .spin .sec{color:var(--grilli-text)}
+@media(max-width:500px){
+ html body .grilliBrand{gap:8px;font-size:12px}
+ html body .grilliBrand img{height:20px}
+ html body .grilliBrand .viewerName{padding-left:8px}
+ html body .grilliBrand .muted{display:none}
+}
+
+/* Self-contained Inter font, so local and offline viewers match the company site.
+Copyright (c) 2016-2020 The Inter Project Authors.
+"Inter" is trademark of Rasmus Andersson.
+https://github.com/rsms/inter
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+-----------------------------------------------------------
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+-----------------------------------------------------------
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting -- in part or in whole -- any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION AND CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+*/
+@font-face{font-family:Inter;src:url("../fonts/inter-17fe38ab302c7e5d.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
