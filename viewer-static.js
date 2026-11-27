@@ -2005,7 +2005,8 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  if(manifest.length){if(!applyHash()){
   /* multi-rollo: sin hash, abrir una serie del ?rollo= pedido (si la hay); si no, la primera de siempre */
   const ped=new URLSearchParams(location.search).get('scroll');
-  const i=ped?manifest.findIndex(g=>(g.scroll||(g.catalogMeta&&g.catalogMeta.scroll))===ped):-1;
+  const i=ped?manifest.findIndex(g=>(g.scroll||(g.catalogMeta&&g.catalogMeta.scroll))===ped)
+   :manifest.findIndex(g=>g.id===window.VISOR_STATIC?.defaultSeriesId);
   if(i>=0)select(i);else{const pri=CARPETAS.get(ORDEN[0]);pri&&pri.length?irA(pri[0]):select(0)}}}else {
   $('notice').textContent=catalogTotalSeries?'No verified mesh associations are available in this view. Enable Unverified in the explorer to browse the available maps.':'No maps are available in the loaded manifest.';
   $('notice').hidden=false;im.hidden=true;$('download').removeAttribute('href');
