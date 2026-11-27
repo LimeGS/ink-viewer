@@ -2532,7 +2532,7 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   grid=$('superGrid');defs=document.createElementNS(NS,'svg');defs.setAttribute('width',0);defs.setAttribute('height',0);defs.style.position='absolute';
   defs.innerHTML='<defs id="superDefs"></defs>';ov.append(defs);
   armarGrid();
-  gridObserver=new ResizeObserver(()=>{menuEl?.remove();menuEl=null;columnas();pedir()});gridObserver.observe(grid);
+  gridObserver=new ResizeObserver(()=>{closeMenu();columnas();pedir()});gridObserver.observe(grid);
   $('superCerrar').onclick=cerrar;$('superMax').onclick=()=>{conMax=!conMax;localStorage.setItem('vesuvius.super.max',conMax?'1':'0');$('superMax').classList.toggle('on',conMax);fuentes();armarGrid()};$('superMax').classList.toggle('on',conMax);$('superPng').onclick=()=>superPng(true);
   if(typeof window.voltear==='function'){$('superVF').onclick=()=>window.voltear('f');$('superVC').onclick=()=>window.voltear('c')}else{$('superVF').hidden=$('superVC').hidden=true}$('superTam').onchange=e=>{tam=+e.target.value;armarGrid()};
   $('superProf').oninput=e=>{prof=+e.target.value;$('superProfV').textContent=(prof>0?'+':'')+prof;fuentes();pedir()};
@@ -2545,7 +2545,7 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   grid.ondblclick=e=>{const t=e.target.closest('.sup');if(t)principal(+t.dataset.i)};
   grid.oncontextmenu=e=>{const t=e.target.closest('.sup');if(!t)return;e.preventDefault();menu(e.clientX,e.clientY,+t.dataset.i)};
   document.addEventListener('keydown',tecla);pedir()}
- function cerrar(){if(!ov)return;gridObserver?.disconnect();gridObserver=null;menuEl?.remove();menuEl=null;ov.remove();ov=grid=defs=null;$('superCss')&&$('superCss').remove();document.removeEventListener('keydown',tecla);cancelAnimationFrame(raf);raf=0;zDefs=-1}
+ function cerrar(){if(!ov)return;gridObserver?.disconnect();gridObserver=null;closeMenu();ov.remove();ov=grid=defs=null;$('superCss')&&$('superCss').remove();document.removeEventListener('keydown',tecla);cancelAnimationFrame(raf);raf=0;zDefs=-1}
  function tecla(e){if(e.key==='Escape')cerrar();else if(e.key==='ArrowLeft'){cx-=60/z;pedir()}else if(e.key==='ArrowRight'){cx+=60/z;pedir()}else if(e.key==='ArrowUp'){cy-=60/z;pedir()}else if(e.key==='ArrowDown'){cy+=60/z;pedir()}}
  function columnas(){if(!grid)return;const ancho=conMax?2*tam+4:tam;const cols=Math.max(1,Math.floor((grid.clientWidth-8)/(ancho+4)));grid.style.gridTemplateColumns='repeat('+cols+','+ancho+'px)'}
  function armarGrid(){grid.innerHTML='';const ancho=conMax?2*tam+4:tam;columnas();
@@ -2596,16 +2596,28 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   return c};
  function paneDe(i){const v=V[i];return v?{t:'Super: '+v.t,fx:Object.assign({},FXDEF,v.fx)}:null}
  function terminar(t){cerrar();defsPanes();pintarPanes();fxPintarPresets();if(typeof fit==='function')fit();if(typeof msg==='function')msg(t)}
- /* doble clic: esa configuracion como vista principal (unico cuadrante) */
- function principal(i){const p=paneDe(i);if(!p)return;PANES=[p];terminar('main view: '+p.t)}
+ function principal(i){
+  const preset=V[i];if(!preset)return;
+  if(MODSEL.length>1){
+   const picker=$('selModelo'), model=picker.value||MODSEL[0];
+   MODSEL=[model];
+   llenarModelos(Array.from(picker.options,option=>option.value),model,lamActual());
+  }
+  PANES=[];
+  FX=Object.assign({},FXDEF,preset.fx,{abierto:FX.abierto});
+  fxGuardar();fxAUI();fxPedir();
+  terminar('Main view: '+preset.t)
+ }
  /* Split view: se AGREGA a los cuadrantes que ya estan (hasta 4; lleno reemplaza el ultimo) */
  function llevar(i){const p=paneDe(i);if(!p)return;const j=PANES.findIndex(q=>q.t===p.t);if(j<0){if(PANES.length<4)PANES.push(p);else PANES[3]=p}terminar('split view: '+p.t)}
  let menuEl=null;
- function menu(px,py,i){if(menuEl)menuEl.remove();menuEl=document.createElement('div');menuEl.style.cssText='position:fixed;z-index:10001;left:'+px+'px;top:'+py+'px;background:var(--grilli-panel,#0b1016);border:1px solid var(--grilli-control-border,#344254);border-radius:4px;padding:4px;font:12px var(--grilli-font,ui-monospace);color:var(--grilli-text,#c9d6e2);box-shadow:0 4px 18px #000a';
+ function closeMenu(){menuEl?.remove();menuEl=null;document.removeEventListener('pointerdown',dismissMenu)}
+ function dismissMenu(event){if(menuEl&&!menuEl.contains(event.target))closeMenu()}
+ function menu(px,py,i){closeMenu();menuEl=document.createElement('div');menuEl.style.cssText='position:fixed;z-index:10001;left:'+px+'px;top:'+py+'px;background:var(--grilli-panel,#0b1016);border:1px solid var(--grilli-control-border,#344254);border-radius:4px;padding:4px;font:12px var(--grilli-font,ui-monospace);color:var(--grilli-text,#c9d6e2);box-shadow:0 4px 18px #000a';
   [['Split view (add to the viewer)',()=>llevar(i)],['Set as main view',()=>principal(i)],['Cancel',()=>{}]].forEach(([t,f])=>{const b=document.createElement('div');b.textContent=t;b.style.cssText='padding:5px 12px;cursor:pointer;border-radius:4px';
-   b.onmouseenter=()=>b.style.background='var(--grilli-raised,#1e2a38)';b.onmouseleave=()=>b.style.background='';b.onclick=ev=>{ev.stopPropagation();menuEl.remove();menuEl=null;f()};menuEl.append(b)});
+   b.onmouseenter=()=>b.style.background='var(--grilli-raised,#1e2a38)';b.onmouseleave=()=>b.style.background='';b.onclick=ev=>{ev.stopPropagation();closeMenu();f()};menuEl.append(b)});
   menuEl.id='superMenu';document.body.append(menuEl);
-  const bounds=menuEl.getBoundingClientRect();menuEl.style.left=Math.max(8,Math.min(px,innerWidth-bounds.width-8))+'px';menuEl.style.top=Math.max(8,Math.min(py,innerHeight-bounds.height-8))+'px';setTimeout(()=>document.addEventListener('pointerdown',()=>{menuEl&&menuEl.remove();menuEl=null},{once:true}),0)}
+  const bounds=menuEl.getBoundingClientRect();menuEl.style.left=Math.max(8,Math.min(px,innerWidth-bounds.width-8))+'px';menuEl.style.top=Math.max(8,Math.min(py,innerHeight-bounds.height-8))+'px';document.addEventListener('pointerdown',dismissMenu)}
  /* ---- boton y tecla ---- */
  const b=document.createElement('button');b.id='superBtn';b.textContent='Super';b.title='Mosaic of ~100 filters at once over the region you are looking at (key M)';
  b.onclick=abrir;const fb=$('filtrosBtn');fb&&fb.after(b);
