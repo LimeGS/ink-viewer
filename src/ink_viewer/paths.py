@@ -23,6 +23,7 @@ def web_asset(name):
         ".woff2": "fonts",
         ".html": "pages",
         ".webp": "images",
+        ".ico": "images",
     }.get(suffix)
     return name if name == "index.html" else f"{folder}/{name}"
 

@@ -55,7 +55,7 @@ CODE = WEB_ROOT
 STATIC = {
     str(path.relative_to(CODE))
     for path in CODE.rglob("*")
-    if path.is_file() and path.suffix in {".js", ".css", ".html", ".woff2", ".webp"}
+    if path.is_file() and path.suffix in {".js", ".css", ".html", ".woff2", ".webp", ".ico"}
 }
 LOG_FILE = None  # set by main() next to the --config file
 

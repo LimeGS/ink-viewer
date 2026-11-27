@@ -83,7 +83,7 @@
   const key=Object.values(g.frames).join('|')+'|'+$('contrast').value;if(POOL.id!==key){poolLimpiar();POOL.id=key}
   const near=vecinos(g);
   Object.keys(POOL.imgs).forEach(c=>{if(!near.includes(+c)){POOL.imgs[c].remove();delete POOL.imgs[c];if(POOL.activo===+c)poolOcultar()}});
-  near.forEach(c=>{if(POOL.imgs[c])return;const e=document.createElement('img');e.className='poolImg';e.decoding='async';e.draggable=false;
+  near.forEach(c=>{if(POOL.imgs[c])return;const e=document.createElement('img');e.crossOrigin='anonymous';e.className='poolImg';e.decoding='async';e.draggable=false;
    e.style.cssText='position:absolute;left:0;top:0;max-width:none;user-select:none;pointer-events:none;visibility:hidden;filter:var(--fx)';
    e.src=urlDe(g.frames[c]);e.dataset.c=String(c);POOL.imgs[c]=e;e.decode().then(()=>{e.dataset.ok='1'}).catch(()=>{});im.after(e)})}
  function poolMostrar(c){const e=POOL.imgs[c];if(!e||e.dataset.ok!=='1'){poolOcultar();return false}
@@ -96,13 +96,13 @@
  window.precargaPool=()=>({id:POOL.id,decodificadas:Object.values(POOL.imgs).filter(e=>e.dataset.ok==='1').length,activo:POOL.activo});
  /* ---- low-res preview: <dir>/fixed_lo.jpg (1/4 scale JPEG, ~30 KB, all of them cached on the Mac) shown at once
     while the full-res PNG loads; hidden as soon as the full image (or the pool frame) is up. ---- */
- const lo=document.createElement('img');lo.id='lowres';lo.decoding='async';lo.draggable=false;
+ const lo=document.createElement('img');lo.crossOrigin='anonymous';lo.id='lowres';lo.decoding='async';lo.draggable=false;
  lo.style.cssText='position:absolute;left:0;top:0;max-width:none;user-select:none;pointer-events:none;visibility:hidden;filter:var(--fx);image-rendering:auto';
  im.before(lo);
  /* tiered: 1/8 first (~10 KB), then 1/4 once it is decoded, then the HD png hides both */
  lo.onload=()=>{if(lo.dataset.for!==im.src)return;const f=/(_lo8|-ds8)\.jpg$/.test(lo.src)?8:4;lo.style.width=(lo.naturalWidth*f)+'px';lo.style.height=(lo.naturalHeight*f)+'px';
   if(!(im.complete&&im.naturalWidth)&&POOL.activo==null)lo.style.visibility='';
-  if(f===8){const u4=lo.src.replace(/_lo8\.jpg$/,'_lo.jpg').replace(/-ds8\.jpg$/,'-ds4.jpg'),pre=new Image();pre.onload=()=>{if(lo.dataset.for===im.src&&lo.style.visibility!=='hidden')lo.src=u4};pre.src=u4}};
+  if(f===8){const u4=lo.src.replace(/_lo8\.jpg$/,'_lo.jpg').replace(/-ds8\.jpg$/,'-ds4.jpg'),pre=new Image();pre.crossOrigin='anonymous';pre.onload=()=>{if(lo.dataset.for===im.src&&lo.style.visibility!=='hidden')lo.src=u4};pre.src=u4}};
  lo.onerror=()=>{if(/(_lo8|-ds8)\.jpg$/.test(lo.src)){lo.src=lo.src.replace(/_lo8\.jpg$/,'_lo.jpg').replace(/-ds8\.jpg$/,'-ds4.jpg');return}lo.style.visibility='hidden'};
  const loMostrar=()=>{if(!im.src||im.src.startsWith('blob:')){lo.style.visibility='hidden';return}
   const u=previewOf(im.src,8);if(!u)return;lo.dataset.for=im.src;lo.style.visibility='hidden';lo.src=u};

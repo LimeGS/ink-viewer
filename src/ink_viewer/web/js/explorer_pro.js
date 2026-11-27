@@ -170,7 +170,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  ctl.forEach(([id,k,t])=>{const e=$(id);e.oninput=()=>{F[k]=t==='bool'?e.checked:e.value;pintar()}});$('xpDir').onclick=()=>{F.desc=!F.desc;pintar()};
  bThumb.onclick=()=>{F.thumbs=!F.thumbs;save();armarFlat();$('xpList').scrollTop=0;pintarVentana();sync()};
  window.xpRepintar=()=>pintar();
- const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem('vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
+ const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
  function sync(){ctl.forEach(([id,k,t])=>{const e=$(id);if(t==='bool')e.checked=!!F[k];else if(document.activeElement!==e)e.value=F[k];if(t==='num')e.classList.toggle('on',F[k]!=='')});syncView();$('xpDir').textContent=F.desc?'↓':'↑';$('xpDir').title=F.desc?'Descending — reverse sort':'Ascending — reverse sort';activeFilters();bThumb.classList.toggle('on',!!F.thumbs);bThumb.setAttribute('aria-pressed',String(!!F.thumbs))}
  let ROWS=[],VIS=[],FLAT=[],LABS=new Set();const ABIERTAS=new Set();
  /* 24-sep: a segment row unfolds into its maps (one per lamina x model x face), the segment's own maps first */
@@ -232,10 +232,10 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
     '<span class="num">'+(r.cm!=null?r.cm.toFixed(2):'—')+'</span><span class="num" title="v5 legibility'+(r.v5c!=null?' @c'+r.v5c:'')+(r.v5m?' · '+r.v5m:'')+(r.v5p!=null?' · p'+r.v5p.toFixed(1)+' within scroll and model':'')+'">'+(r.v5==null?'—':F.v5m==='pct'?'p'+r.v5p.toFixed(1):r.v5.toFixed(3))+'</span>'+marca(r);
    d.title=meshTooltip(r.e.items);d.querySelector('.n').title+='\n'+d.title;
    if(F.thumbs){const first=thumbDe(r),base=thumbDe(r,/base/i),thumbs=[first,...(base&&base.u!==first?.u?[base]:[])].filter(Boolean),box=document.createElement('div');box.className='thumbs';d.append(box);thumbs.forEach(t=>{if(t.u){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=modCorto(t.m)+' · c'+(+t.c>=0?'+':'')+t.c;figure.append(caption);box.append(figure);const im=document.createElement('img');im.className='th';im.alt=modCorto(t.m)+' preview';im.decoding='async';im.tabIndex=0;
-    im.title=modCorto(t.m)+' \u00b7 c'+(+t.c>=0?'+':'')+t.c+' \u00b7 preview';im.loading='lazy';im.fetchPriority='low';im.src=t.u;
+    im.title=modCorto(t.m)+' \u00b7 c'+(+t.c>=0?'+':'')+t.c+' \u00b7 preview';im.crossOrigin='anonymous';im.loading='lazy';im.fetchPriority='low';im.src=t.u;
     im.onerror=()=>{if(t.fallback&&im.src!==t.fallback){im.src=t.fallback;t.zoom=t.fallback}
       else im.style.visibility='hidden'};
-    im.onmouseenter=im.onfocus=()=>{let z=$('xpZoom');if(!z){z=document.createElement('img');z.id='xpZoom';z.alt='';
+    im.onmouseenter=im.onfocus=()=>{let z=$('xpZoom');if(!z){z=document.createElement('img');z.crossOrigin='anonymous';z.id='xpZoom';z.alt='';
      z.style.cssText='position:fixed;z-index:9999;max-width:min(62vw,900px);max-height:86vh;border:1px solid #2d8a6d;background:#05080c;box-shadow:0 8px 30px #000a;pointer-events:none';
      z.onerror=()=>{z.hidden=true};document.body.append(z)}const b=im.getBoundingClientRect();z.src=t.zoom;
      z.style.left=Math.max(8,Math.min(b.right+12,innerWidth-Math.min(innerWidth*.62,900)-8))+'px';

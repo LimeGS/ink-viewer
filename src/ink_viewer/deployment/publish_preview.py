@@ -83,7 +83,8 @@ def code_bundle(repo, commit, bundle):
         nested_source = (
             name.startswith("src/ink_viewer/")
             and path.suffix in suffixes | {".woff2"}
-            or name == "src/ink_viewer/web/images/grilli.webp"
+            or name
+            in {"src/ink_viewer/web/images/grilli.webp", "src/ink_viewer/web/images/favicon.ico"}
         )
         nested_test = (
             name.startswith("tests/python/")

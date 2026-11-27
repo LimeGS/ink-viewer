@@ -30,10 +30,10 @@ const catalogTotalSeries=manifest.length;
    Explicit preferences and deep links still control whether unverified maps are shown. */
 /* 25-sep: &sinverificar=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
 function mostrarSinVerificar(entries,source,saved,hash){
- const fallback=!!source&&entries.some(g=>g.catalogMeta)&&!entries.some(hasVerifiedMeshAssociation);
+ const fallback=!!source&&(globalThis.VISOR_STATIC||entries.some(g=>g.catalogMeta))&&!entries.some(hasVerifiedMeshAssociation);
  return hash==='1'||(saved!==null?saved==='1':fallback);
 }
-const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem('vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
+const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
 manifest.splice(0,manifest.length,...manifest.filter(g=>hasVerifiedMeshAssociation(g)||SIN_VERIFICAR&&Object.keys(g.frames||{}).length));
 const $=id=>document.getElementById(id), vp=$('viewport'), im=$('map'), slider=$('depth'), stage=$('stage');
 let group,zoom=1,x=0,y=0,fitted=true,projection=false,request=0,drag=null,fullresReady=0,fullresGroup=null,fullresDepth=null,maskReady=false;
@@ -136,14 +136,14 @@ function ensureContrast(){for(const o of $('contrast').options){o.dataset.origin
 function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThis.recorteVista.showing();if(pintar)release();if(!group.catalogMeta)for(const o of $('contrast').options)o.disabled=false;ensureContrast();let n=Number(slider.value),dir=projection?group.maximum:group.frames[n];$('offset').value=projection?'Max.':group.catalogMeta?.depthKnown===false?'Map':signed(n);pintarBanda(n);syncHash();if(projection){const o=group.maximumOffsets||[];$('projection').textContent='Maximum '+(o.length?signed(Math.min(...o))+'…'+signed(Math.max(...o)):'across depths')+' · can merge strokes from different sheets or artefacts.'}$('prev').disabled=projection||n<=Number(slider.min);$('next').disabled=projection||n>=Number(slider.max);slider.disabled=projection||group.catalogMeta?.depthKnown===false;$('projection').hidden=!projection;$('max').classList.toggle('active',projection);$('max').setAttribute('aria-pressed',String(projection));let token=++request;fullresReady=0;$('notice').hidden=false;im.style.opacity='.3';
  if(!dir){$('notice').textContent='This centre is not available yet';im.hidden=true;$('download').removeAttribute('href');return}
  const staticMap=globalThis.VISOR_STATIC?.select(dir,$('contrast').value);
- const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();loader.crossOrigin='anonymous';
+ const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();loader.crossOrigin='anonymous';loader.fetchPriority='high';
  loader.onload=()=>{if(token!==request)return;if(globalThis.recorteVista)globalThis.recorteVista.reduced(null);let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=staticMap?.original||url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px'+(globalThis.recorteVista?globalThis.recorteVista.title():'');if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
  /* 24-nov: a TIFF map too large for full resolution in a browser (official whole segments reach gigapixels) opens as a
     reduced, browse-only view: the 1/4 map, or the published 1/8 JPEG. fullresReady stays 0, so labeling stays locked. */
  const reduced=()=>{if(token!==request)return;const W=loader.naturalWidth,H=loader.naturalHeight,changed=im.naturalWidth!==W||im.naturalHeight!==H;
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
   im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=staticMap?.original||loader.src;
-  $('notice').hidden=false;$('notice').textContent=staticMap?'Published preview · browse only. Open the original TIFF for its native grid.':'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
+  $('notice').hidden=false;$('notice').textContent=staticMap?(staticMap.caption||'Published preview · browse only. Open the original TIFF for its native grid.'):'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
   if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
  if(staticMap?.preview){loader.reduced=true;loader.onload=reduced}
  loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);

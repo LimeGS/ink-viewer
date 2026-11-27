@@ -18,10 +18,13 @@ async function open(source, files) {
     assert.equal(options.credentials, 'omit');
     const url = new URL(target, page);
     assert(!url.pathname.startsWith('/api/'));
-    return Object.hasOwn(files, url.href) ? Response.json(files[url.href]) : new Response(null, {status: 404});
+    const body = files[url.href];
+    if (typeof body === 'string') return new Response(body, {headers: {'Content-Type':'application/xml'}});
+    return Object.hasOwn(files, url.href) ? Response.json(body) : new Response(null, {status: 404});
   };
   w.OFFICIAL_FRAME = /^\.\.\/catalog\/.+\/ink-detection\//;
   w.etiqOn = false;
+  w.previewOf = () => null;
   await w.eval(bootstrap);
   return w;
 }
@@ -32,7 +35,7 @@ test('official catalog uses its published preview, locks labeling and retains th
   try {
     const map = w.VISOR_STATIC.select(frame, 'fixed');
     assert.equal(map.original, root + file);
-    assert.equal(w.VISOR_STATIC.mapUrl(frame, 'fixed'), root + 'small.jpg');
+    assert.equal(w.VISOR_STATIC.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
     assert.equal(w.document.querySelector('#etiq').disabled, true);
     assert.equal(w.visorPuedeGuardar, false);
     assert.equal(w.document.querySelector('script').src, page + 'viewer-static.js');
@@ -65,5 +68,42 @@ test('unavailable remote index leaves the source picker usable', async () => {
     assert.match(w.document.querySelector('#notice').textContent, /Could not open this dataset/);
     assert(w.document.querySelector('header input'));
     assert.equal(w.document.querySelector('script'), null);
+  } finally { w.close(); }
+});
+
+test('source picker exposes the presets and asks for a path only in custom mode', async () => {
+  const preview = 'https://huggingface.co/datasets/test/resolve/main/entry/preview.jpg';
+  const w = await open('ink-labels', {[page + 'ink-labels.json']: {root, entries}});
+  try {
+    const select = w.document.querySelector('header select'), input = w.document.querySelector('header input');
+    assert.deepEqual(Array.from(select.options, o => o.value), ['official', 'ink-labels', 'custom']);
+    assert.equal(select.value, 'ink-labels');
+    assert(input.hidden);
+    select.value = 'custom'; select.dispatchEvent(new w.Event('change'));
+    assert(!input.hidden && input.required);
+    assert.equal(w.VISOR_STATIC.select(preview, 'fixed').preview, true);
+    assert.equal(w.VISOR_STATIC.mapUrl(preview, 'fixed'), preview);
+    assert(w.document.querySelector('#etiq').disabled);
+  } finally { w.close(); }
+});
+
+test('S3 image paths and a standalone HTTP manifest resolve to the published objects', async () => {
+  const s3 = await open('s3://demo.bucket/images/paper.png', {});
+  const http = await open(root + 'scans.json', {[root + 'scans.json']: [{...entries[0], frames: {0: 'nested/paper.png'}}]});
+  try {
+    assert.equal(s3.manifest[0].frames[0], 'https://s3.amazonaws.com/demo.bucket/images/paper.png');
+    assert.equal(http.VISOR_STATIC.mapUrl('nested/paper.png','fixed'), root + 'nested/paper.png');
+  } finally { s3.close(); http.close(); }
+});
+
+test('unindexed S3 prefix consumes every result page and preserves encoded image keys', async () => {
+  const bucket = 'https://example-bucket.s3.amazonaws.com/';
+  const list = bucket + '?list-type=2&encoding-type=url&prefix=maps%2F';
+  const w = await open('s3://example-bucket/maps/', {
+    [list]: '<ListBucketResult><Contents><Key>maps%2Fa%2Bb.png</Key></Contents><IsTruncated>true</IsTruncated><NextContinuationToken>next</NextContinuationToken></ListBucketResult>',
+    [list + '&continuation-token=next']: '<ListBucketResult><Contents><Key>maps%2Fb%20c.tif</Key></Contents><Contents><Key>maps%2Findex.txt</Key></Contents><IsTruncated>false</IsTruncated></ListBucketResult>'
+  });
+  try {
+    assert.deepEqual(Array.from(w.manifest, e => e.frames[0]), [bucket + 'maps/a%2Bb.png',bucket + 'maps/b%20c.tif']);
   } finally { w.close(); }
 });
