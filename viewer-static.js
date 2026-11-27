@@ -797,10 +797,10 @@ function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThi
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
   im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=staticMap?.original||loader.src;
   $('notice').hidden=false;$('notice').textContent=staticMap?(staticMap.caption||'Published preview · browse only. Open the original TIFF for its native grid.'):'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
-  if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
+  if(globalThis.recorteVista)globalThis.recorteVista.reduced(!staticMap||VISOR_STATIC.cropTarget?{url,w:W,h:H,original:staticMap?.original}:null);im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
  if(staticMap?.preview){loader.reduced=true;loader.onload=reduced}
  loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);
-  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true);loader.src=mapUrl(dir,$('contrast').value,4);return}
+  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true,!!VISOR_STATIC.cropTarget);loader.src=mapUrl(dir,$('contrast').value,4);return}
   if(staticMap){cargandoOff();im.hidden=true;$('download').href=staticMap.original;$('notice').textContent='Cannot display this map. Check browser access (CORS), or open the original file.';return}
   cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
 }
@@ -2538,10 +2538,19 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   $('superProf').oninput=e=>{prof=+e.target.value;$('superProfV').textContent=(prof>0?'+':'')+prof;fuentes();pedir()};
   grid.addEventListener('wheel',e=>{e.preventDefault();z=Math.max(.05,Math.min(8,z*Math.exp(-Math.max(-100,Math.min(100,e.deltaY))*.004)));pedir()},{passive:false});
   grid.addEventListener('scroll',pedir,{passive:true});
-  grid.onpointerdown=e=>{if(e.button!==0)return;drag={x:e.clientX,y:e.clientY,m:0};grid.setPointerCapture(e.pointerId);grid.classList.add('drag')};
-  grid.onpointermove=e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;drag.m+=Math.abs(dx)+Math.abs(dy);cx-=dx/z;cy-=dy/z;pedir()};
-  grid.onpointerup=e=>{const m=drag?drag.m:99;drag=null;grid.classList.remove('drag');
-   };
+  grid.onpointerdown=e=>{if(e.button===0)drag={x:e.clientX,y:e.clientY,pointer:e.pointerId,active:false}};
+  grid.onpointermove=e=>{
+   if(!drag||drag.pointer!==e.pointerId)return;
+   const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+   if(!drag.active){
+    if(Math.abs(dx)+Math.abs(dy)<4)return;
+    grid.setPointerCapture(e.pointerId);grid.classList.add('drag');drag.active=true;
+   }
+   drag.x=e.clientX;drag.y=e.clientY;cx-=dx/z;cy-=dy/z;pedir();
+  };
+  const stopDrag=e=>{if(drag?.pointer===e.pointerId){drag=null;grid.classList.remove('drag')}};
+  grid.onpointerup=grid.onpointercancel=stopDrag;
+  grid.onpointerleave=e=>{if(!drag?.active)stopDrag(e)};
   grid.ondblclick=e=>{const t=e.target.closest('.sup');if(t)principal(+t.dataset.i)};
   grid.oncontextmenu=e=>{const t=e.target.closest('.sup');if(!t)return;e.preventDefault();menu(e.clientX,e.clientY,+t.dataset.i)};
   document.addEventListener('keydown',tecla);pedir()}
@@ -4559,6 +4568,86 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  const syncModes=()=>modes.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.classList.contains('on'))));
  new MutationObserver(syncModes).observe(modes,{subtree:true,attributes:true,attributeFilter:['class']});syncModes();reveal();
 },{once:true});
+
+;
+/* Labeling by crop (server: /api/mapa/...?recorte=x,y,w,h). A map too large to label whole opens as a reduced,
+   browse-only view; "Label a crop" turns the next click on it into a full-resolution window of SIZE px a side (8192: about 67 Mpx, the mask limit, labels smoothly) that
+   labels like any map. Its mask pair is saved apart (labels/.../recorte-x<x>-y<y>-<w>x<h>) with the window in its
+   provenance, and its browser canvas has its own key, so crops never overwrite each other or the whole map.
+   "Whole map" goes back to the reduced view. viewer.js, corte.js, etiquetar.js and etiq_herramientas.js read the
+   window through window.recorteVista. */
+(function(){
+ const staticViewer=window.VISOR_STATIC, SIZE=staticViewer?2048:8192,$id=id=>document.getElementById(id);
+ const state={crop:null,reduced:null,picking:false,down:null};
+ const lam=()=>typeof group!=='undefined'&&group&&(group.catalogMeta&&group.catalogMeta.lam||group.id)||null;
+ const say=t=>{if(typeof msg==='function')msg(t)};
+ const redraw=()=>{if(typeof show==='function')show(true)};
+ function paintButton(){const b=$id('recorteBtn');if(!b)return;
+  b.hidden=!state.crop&&!state.reduced;b.classList.toggle('active',state.picking);b.setAttribute('aria-pressed',String(state.picking));
+  b.textContent=state.crop?'Whole map':state.picking?'Click the map…':'Label a crop'}
+ /* full-map pixel window around a click on the reduced view, snapped to a half-window grid: clicks near the same place
+    reopen the same crop (and its saved mask) instead of a window a few pixels off */
+ function windowAt(p,full,reduced){const w=Math.min(SIZE,full.w),h=Math.min(SIZE,full.h),
+   at=(v,size,total)=>Math.max(0,Math.min(total-size,Math.round((v-size/2)/(SIZE/2))*(SIZE/2)));
+  return {x:at(p[0]*full.w/reduced.w,w,full.w),y:at(p[1]*full.h/reduced.h,h,full.h),ancho:w,alto:h,ancho_mapa:full.w,alto_mapa:full.h}}
+ function choose(){
+  state.picking=!state.picking;paintButton();
+  if(staticViewer)document.getElementById('notice').textContent=state.picking
+   ?'Click the map to label a full-resolution crop.':'Published preview · select Label to edit a crop.';
+ }
+ async function pick(p){
+  const r=state.reduced;state.picking=false;paintButton();if(!r)return;
+  const owner=group;
+  if(staticViewer&&(p[0]<0||p[0]>=r.w||p[1]<0||p[1]>=r.h)){choose();return}
+  try{
+   let full;
+   if(staticViewer)full=await staticViewer.cropDimensions(r.original);
+   else{
+    const response=await fetch('/api/dims/'+r.url.split('?')[0].replace(/^\/api\/mapa\//,''));
+    full=response.ok?await response.json():null;
+   }
+   if(state.reduced!==r||group!==owner||state.picking||state.crop)return;
+   if(!full||!(full.w>0&&full.h>0))throw new Error('the map size could not be read');
+   if(staticViewer&&Math.abs(r.w/r.h-full.w/full.h)/(full.w/full.h)>.03)
+    throw new Error('the preview does not match the original grid');
+   state.crop={...windowAt(p,full,r),lam:lam(),...(staticViewer?{original:r.original}:{})};
+   say('Loading a full-resolution crop…');redraw();
+   if(staticViewer)modoEtiq(true);
+  }catch(error){
+   if(state.reduced!==r||group!==owner)return;
+   const message='Crop unavailable: '+error.message;
+   say(message);
+   if(staticViewer)document.getElementById('notice').textContent=message;
+  }
+ }
+ function init(){
+  const button=document.createElement('button');button.id='recorteBtn';button.hidden=true;
+  button.title='Label a full-resolution window of a map too large to label whole';
+  const anchor=$id('download');if(anchor)anchor.parentNode.insertBefore(button,anchor);else document.querySelector('.toolbar').appendChild(button);
+  button.addEventListener('click',()=>{if(state.crop){state.crop=null;redraw();return}choose()});
+  const vp=$id('viewport');
+  /* document capture runs before viewer.js's own capture listener on #viewport, which stops the event while labeling waits
+     for full resolution; while picking, the press is ours alone (no "view-only" note, no pan) and the click still follows */
+  if(vp){document.addEventListener('pointerdown',e=>{if(!vp.contains(e.target))return;state.down=[e.clientX,e.clientY];if(state.picking)e.stopPropagation()},true);
+   vp.addEventListener('click',e=>{if(!state.picking||!state.down||Math.abs(e.clientX-state.down[0])+Math.abs(e.clientY-state.down[1])>4)return;
+    if(typeof rp==='function')pick(rp(e))})}
+  paintButton();return true}
+ window.recorteVista={state,windowAt,pick,choose,init,
+  /* viewer.js: start of show(); another segment drops the crop */
+  showing(){if(state.crop&&state.crop.lam!==lam())state.crop=null},
+  /* viewer.js: the reduced view is on screen ({url,w,h}) or a full-resolution image is (null) */
+  reduced(r){state.reduced=r||null;if(!r)state.picking=false;else state.picking=state.picking&&!state.crop;paintButton();
+   if(staticViewer&&r&&state.picking)document.getElementById('notice').textContent='Click the map to label a full-resolution crop.'},
+  /* viewer.js: a crop that fails to load falls back to the reduced view */
+  failed(){if(!state.crop)return false;state.crop=null;say('The crop could not be loaded; back to the reduced view');return true},
+  /* only maps of the cropped segment (other models in compare panes too), never those of other segments */
+  query:frame=>state.crop&&String(frame||'').includes('/segments/'+state.crop.lam+'/')?'&recorte='+[state.crop.x,state.crop.y,state.crop.ancho,state.crop.alto].join(','):'',
+  /* canvas key part, placed before |c<depth> so the depth-stripping owner check (vetoGuardado) still matches */
+  key:()=>state.crop?'|r'+state.crop.x+','+state.crop.y:'',
+  info:()=>state.crop?{x:state.crop.x,y:state.crop.y,ancho:state.crop.ancho,alto:state.crop.alto,ancho_mapa:state.crop.ancho_mapa,alto_mapa:state.crop.alto_mapa}:null,
+  title:()=>state.crop?' · crop at '+state.crop.x+', '+state.crop.y+' of '+state.crop.ancho_mapa+' × '+state.crop.alto_mapa:'',
+  ready:init()};
+})();
 
 ;
 addEventListener(window.VISOR_STATIC.readyEvent, () => {

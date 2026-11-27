@@ -241,6 +241,13 @@
     function labelURL(frame) {
       return style.value === 'preview' ? frame : new URL('labels/style_' + style.value + '.png', frame).href;
     }
+    function tiffRoute(original, scale = 1) {
+      const route = new URL('tiff.png', page);
+      route.searchParams.set('src', original);
+      route.searchParams.set('scale', scale);
+      return route;
+    }
+    const cropTool = () => window.recorteVista;
     window.VISOR_STATIC = {
       readyEvent: 'ink-viewer-ready', reduced: false, resource,
       hasPublishedLabels: labels && decode,
@@ -249,10 +256,17 @@
         if (labels && decode && style.value === 'preview') {
           style.value = 'A';
           show(true);
-        } else if (!labels && this.reduced && !full.hidden && !document.getElementById('etiq').disabled) {
-          wantOriginal = true;
-          show(true);
+        } else if (this.cropTarget && this.reduced) {
+          cropTool()?.choose();
         }
+      },
+      cropTarget: null,
+      async cropDimensions(original) {
+        const route = tiffRoute(original);
+        route.searchParams.set('mode', 'dimensions');
+        const response = await fetch(route, {credentials: 'omit'});
+        if (!response.ok) throw new Error(await response.text());
+        return response.json();
       },
       // The PHercParis4 map for segment 20230929220926 shows readable text at preview resolution.
       defaultSeriesId: official ? 'official_0181c8dd4c267c2b5e04' : null,
@@ -276,10 +290,16 @@
             caption: 'Published comparison · CT | label A | label C'};
         }
         const original = image(frame, contrast), tiff = /\.tiff?$/i.test(new URL(original).pathname);
-        if (selectedURL !== original) { selectedURL = original; wantOriginal = !builtIn; }
+        if (selectedURL !== original) {
+          selectedURL = original;
+          wantOriginal = !builtIn;
+          if (cropTool()) cropTool().state.crop = null;
+        }
         const fallback = tiff && preview(original);
-        const usePreview = !!(fallback && (!wantOriginal || !decode));
-        full.hidden = !(tiff && fallback && decode);
+        this.cropTarget = fallback && decode ? original : null;
+        const cropped = cropTool()?.state.crop?.original === original;
+        const usePreview = !!(fallback && !cropped && (!wantOriginal || !decode));
+        full.hidden = cropped || !this.cropTarget;
         document.getElementById('download').textContent = tiff ? 'Open TIFF ↗' : 'Open image ↗';
         this.setReduced(usePreview, !full.hidden);
         return {original, preview: usePreview, fallback};
@@ -293,11 +313,15 @@
         const original = image(frame, contrast);
         if (/\.tiff?$/i.test(new URL(original).pathname)) {
           const jpg = preview(original);
+          const crop = !scale && cropTool()?.state.crop;
+          if (crop && crop.original === original) {
+            const route = tiffRoute(original);
+            route.searchParams.set('crop', [crop.x, crop.y, crop.ancho, crop.alto].join(','));
+            return route.href;
+          }
           if (jpg && (scale || !decode || !wantOriginal)) return jpg;
           if (!decode) return original;
-          const route = new URL('tiff.png', page);
-          route.searchParams.set('src', original); route.searchParams.set('scale', scale || 1);
-          return route.href;
+          return tiffRoute(original, scale || 1).href;
         }
         return scale ? previewOf(original, scale) || original : original;
       }
