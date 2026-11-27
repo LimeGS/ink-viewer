@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import sys
 from io import StringIO
 from pathlib import Path
@@ -33,6 +34,22 @@ def build(out, metadata, label_rows):
     codec = ROOT / "node_modules/geotiff"
     shutil.copyfile(codec / "dist-browser/geotiff.js", out / "geotiff.js")
     shutil.copyfile(codec / "LICENSE", out / "LICENSE-geotiff.txt")
+    hub = ROOT / "node_modules/@huggingface/hub"
+    shutil.copyfile(hub / "LICENSE", out / "LICENSE-huggingface-hub.txt")
+    subprocess.run(
+        [
+            str(ROOT / "node_modules/.bin/esbuild"),
+            "static/mask-hub.js",
+            "--bundle",
+            f"--alias:@huggingface/hub={hub / 'dist/browser/index.mjs'}",
+            "--format=esm",
+            "--minify",
+            "--legal-comments=linked",
+            f"--outfile={out.resolve() / 'mask-hub.js'}",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
     for name in ("LICENSE", "LICENSE-Inter.txt"):
         shutil.copyfile(ROOT / name, out / name)
     browser = [
@@ -41,15 +58,16 @@ def build(out, metadata, label_rows):
         if tool not in {"inksdk.js", "corte.js", "recorte.js", "hd.js", "hist_v5.js"}
     ]
     scripts = ["rollo_visor.js", "etiquetar.js", "etiq_vc3d.js", "viewer.js", *browser]
-    (out / "viewer-static.js").write_text(
-        "\n;\n".join((WEB_ROOT / "js" / name).read_text() for name in scripts), encoding="utf-8"
-    )
+    viewer_scripts = [(WEB_ROOT / "js" / name).read_text() for name in scripts]
+    viewer_scripts.append((ROOT / "static/mask-panel.js").read_text())
+    (out / "viewer-static.js").write_text("\n;\n".join(viewer_scripts), encoding="utf-8")
+    shutil.copyfile(ROOT / "static/mask-panel.css", out / "css/mask-panel.css")
     html = (WEB_ROOT / "index.html").read_text()
     blocks = {
         "preloads": "",
         "badge": '<meta http-equiv="Content-Security-Policy" content="script-src \'self\'; '
         "object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'self'\">",
-        "startup": '<link rel="stylesheet" href="css/responsive.css?v=20261004-compact-labeling">\n<script defer src="pages.js"></script>',
+        "startup": '<link rel="stylesheet" href="css/responsive.css?v=20261004-compact-labeling">\n<link rel="stylesheet" href="css/mask-panel.css">\n<script defer src="pages.js"></script>',
     }
     for marker, replacement in blocks.items():
         pattern = f"<!-- server {marker} -->.*?<!-- end server {marker} -->"
@@ -63,6 +81,8 @@ def build(out, metadata, label_rows):
         "viewer-static.js",
         "raster-worker.js",
         "geotiff.js",
+        "mask-hub.js",
+        "css/mask-panel.css",
         "css/responsive.css",
     ):
         digest.update((out / name).read_bytes())
@@ -70,6 +90,7 @@ def build(out, metadata, label_rows):
     html = html.replace('src="pages.js"', f'src="pages.js?v={version}"').replace(
         "css/responsive.css?v=20261004-compact-labeling", f"css/responsive.css?v={version}"
     )
+    html = html.replace('href="css/mask-panel.css"', f'href="css/mask-panel.css?v={version}"')
     (out / "index.html").write_text(html, encoding="utf-8")
     (out / "official.json").write_text(
         json.dumps(

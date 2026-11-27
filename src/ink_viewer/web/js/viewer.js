@@ -386,7 +386,7 @@ function trasFrame(w,h){cargandoOff();
  if(!group)return;
  curW=w||curW||im.naturalWidth;curH=h||curH||im.naturalHeight;
  if(!curW)return;
- if(globalThis.VISOR_STATIC?.reduced){maskReady=false;montarCapas(null);return}
+ if(globalThis.VISOR_STATIC?.reduced){montarCapas(null);return}
  /* one mask per DEPTH (12-sep): the sheet key carries the centre, so changing depth swaps the working mask (IndexedDB) */
  const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);   /* 25-sep: clave de la grilla (ver claveLienzo) */
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}
@@ -440,7 +440,7 @@ function dibujarRegion(){let r=$('regbox');
  r.setAttribute('x',Math.min(regIni[0],regFin[0]));r.setAttribute('y',Math.min(regIni[1],regFin[1]));
  r.setAttribute('width',Math.abs(regFin[0]-regIni[0]));r.setAttribute('height',Math.abs(regFin[1]-regIni[1]))}
 
-function modoEtiq(v){if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
+function modoEtiq(v){if(v)globalThis.VISOR_STATIC?.prepareLabel?.();if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
  if(window.requireAnnotationHD)window.requireAnnotationHD(v);
  $('etiq').classList.toggle('active',v);$('etiq').setAttribute('aria-pressed',String(v));
  $('mask').style.display=v?'block':'none';espejarMascara();syncHash()}
@@ -1461,6 +1461,38 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  };
  $('exp').textContent='download pair';
  $('exp').title='Download inklabels and supervision PNGs from one snapshot, with matching depth and grid metadata. Allow multiple downloads in the browser.';
+ if(window.VISOR_STATIC){
+  $('exp').textContent='Download masks';
+  if(window.VISOR_STATIC.hasPublishedLabels)window.VISOR_STATIC.importPublishedLabel=async()=>{
+   const url=window.VISOR_STATIC.publishedLabel, target=destinoMascara();
+   if(!url||!target||!window.annotationImageReady())throw new Error('Wait for the native label and mask to load.');
+   if(!window.mascaraVacia()&&!confirm('Replace the working mask with the published label? You can undo this.'))return;
+   const revision=window.revisionMascara(target.info);
+   const response=await fetch(url,{credentials:'omit'});
+   if(!response.ok)throw new Error('Could not load the published label (HTTP '+response.status+').');
+   const pixels=await leerPngMascara(await response.blob(),target.w,target.h);
+   if(!window.annotationImageReady()||url!==window.VISOR_STATIC.publishedLabel||!destinoVigente(target)||
+      revision!==window.revisionMascara(target.info))
+    throw new Error('The active label changed during loading. Try again on the current label.');
+   const out=new ImageData(target.w,target.h);
+   for(let i=0;i<pixels.data.length;i+=4){
+    const value=pixels.data[i];
+    if(pixels.data[i+3]!==255||pixels.data[i+1]!==value||pixels.data[i+2]!==value||![0,1,2,255].includes(value))
+     throw new Error('Unexpected class in the published label.');
+    if(value===0||value===1){out.data.set(value===1?COLOR.tinta:COLOR.no,i);out.data[i+3]=255}
+   }
+   if(reemplazarMascara(out,target))msg('Published label loaded. Undo restores the previous mask.');
+  };
+  window.VISOR_STATIC.captureMaskPair=async()=>{
+   if(!window.annotationImageReady())throw new Error('Wait for the native image and mask to load.');
+   const snapshot=capturar();
+   if(snapshot.vacia)throw new Error('Paint or load a label before uploading.');
+   const blobs=await codificar(snapshot);
+   const {scroll,segmento:segment,profundidad:depth,par_id:pairId}=snapshot.corrida;
+   return {files:snapshot.nombres.map((name,index)=>({name,blob:blobs[index]})), scroll, segment, depth, pairId};
+  };
+  return;
+ }
  const base64=b=>new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=()=>mal(r.error||new Error('Could not read PNG'));r.readAsDataURL(b)});
  // ponytail: one upload queue preserves snapshot order; per-destination queues if throughput matters.
  let subiendo=Promise.resolve();

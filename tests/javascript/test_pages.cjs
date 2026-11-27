@@ -10,7 +10,7 @@ const root = 'https://data.example.org/run/';
 const frame = '../catalog/PHerc123/segments/segment/ink-detection/map.tif';
 const entries = [{id: 'series', scroll: 'PHerc123', frames: {0: frame}}];
 
-async function open(source, files, version) {
+async function open(source, files, version, decoder = false) {
   const html = '<header><span id="count"></span></header><footer><span id="title"></span></footer><div id="notice"></div><button id="etiq"></button><a id="download"></a>';
   const dom = new JSDOM(html, {url: page + '?source=' + encodeURIComponent(source), runScripts: 'outside-only'});
   const w = dom.window;
@@ -23,6 +23,9 @@ async function open(source, files, version) {
     if (typeof body === 'string') return new Response(body, {headers: {'Content-Type':'application/xml'}});
     return Object.hasOwn(files, url.href) ? Response.json(body) : new Response(null, {status: 404});
   };
+  if (decoder) Object.defineProperty(w.navigator, 'serviceWorker', {
+    value: {register: async () => ({}), controller: {scriptURL: page + 'raster-worker.js'}},
+  });
   w.OFFICIAL_FRAME = /^\.\.\/catalog\/.+\/ink-detection\//;
   w.etiqOn = false;
   w.previewOf = () => null;
@@ -111,5 +114,21 @@ test('unindexed S3 prefix consumes every result page and preserves encoded image
   });
   try {
     assert.deepEqual(Array.from(w.manifest, e => e.frames[0]), [bucket + 'maps/a%2Bb.png',bucket + 'maps/b%20c.tif']);
+  } finally { w.close(); }
+});
+
+test('Label switches the published comparison to the native style A grid', async () => {
+  const preview = 'https://huggingface.co/datasets/test/resolve/main/entry/preview.jpg';
+  const w = await open('ink-labels', {[page + 'ink-labels.json']: {root, entries}}, undefined, true);
+  try {
+    const viewer = w.VISOR_STATIC, button = w.document.querySelector('#etiq');
+    w.show = () => viewer.select(preview, 'fixed');
+    assert.equal(viewer.select(preview, 'fixed').preview, true);
+    assert.equal(button.disabled, false);
+    viewer.prepareLabel();
+    assert.equal(viewer.reduced, false);
+    const label = new URL('labels/style_A.png', preview).href;
+    assert.equal(viewer.publishedLabel, label);
+    assert.equal(new URL(viewer.mapUrl(preview, 'fixed')).searchParams.get('src'), label);
   } finally { w.close(); }
 });
