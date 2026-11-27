@@ -2902,20 +2902,19 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
    return '<span class="g" title="'+title+'">'+label+' · '+q.profile+'</span>'}
   return '<span class="g" title="'+GATES.map(([k,n,L])=>L+' '+n+': '+(r[k]===true?'pass':r[k]===false?'fail':'unmeasured')).join('\n')+'">'
   +GATES.map(([k,,L])=>{const v=r[k];return v===true?'<b>'+L+'</b>':v===false?'<s>'+L+'</s>':'<u>'+L+'</u>'}).join(' ')+'</span>'}
- function pintar(){save();sync();pintarChips();LABS=new Set(Object.keys(typeof MSK!=='undefined'?MSK:{}).map(k=>k.slice(0,k.lastIndexOf('|'))));ROWS=[...LAM.values()].map(fila);VIS=ordenar(filtrar(ROWS));armarFlat();const act=typeof lamActual==='function'?lamActual():null;
-  const tot=VIS.reduce((s,r)=>s+(r.cm||0),0);
-  const areas=VIS.filter(r=>r.cm!=null).length;
+ function pintar(){save();sync();pintarChips();LABS=new Set(Object.keys(typeof MSK!=='undefined'?MSK:{}).map(k=>k.slice(0,k.lastIndexOf('|'))));ROWS=[...LAM.values()].map(fila);VIS=ordenar(filtrar(ROWS));armarFlat();
   {const T=GATES.map(([k])=>{let p=0,f=0,u=0;ROWS.forEach(r=>{r[k]===true?p++:r[k]===false?f++:u++});
     return '<tr><th scope="row">'+gateLabels[k]+'</th><td class="p">'+p+'</td><td class="f">'+f+'</td><td class="u">'+u+'</td></tr>'}).join('');
    $('xpTally').innerHTML='<table><caption>All segments · quality gates</caption><thead><tr><th>Gate</th><th>Pass</th><th>Fail</th><th>Unmeasured</th></tr></thead><tbody>'+T+'</tbody></table>'}const nf=['rollo','cert','valid','ct','flat','cont','a4','amin','amax','v5min','v5max','isomax','zmin','zmax','ctmin','rep','piece','lab','star'].filter(k=>F[k]!=='').length+(F.c17?1:0)+(F.unseen?1:0)+(F.q.trim()?1:0);/* 24-sep: segment (row) > map (lamina x model x face, nested) > depth */
- let nGal=0,nProf=0;
- VIS.forEach(r=>{nGal+=r.e.items.length;
-  r.e.items.forEach(it=>{const g=manifest[it.i];if(g.catalogMeta?.depthKnown!==false)nProf+=Object.keys(g.frames||{}).length})});
-    window.XPVIS=nf?new Set(VIS.map(r=>r.lam)):null;
- if(F.modo==='tree'&&typeof pintarArbol==='function')try{pintarArbol()}catch(e){}
- $('xpCount').innerHTML=VIS.length+' of '+ROWS.length+' segments · '+(areas?tot.toFixed(1)+' cm²'+(areas<VIS.length?' ('+areas+' measured)':''):'area unmeasured')
-  +'<span class="lbl"> — '+nGal+' maps · '+nProf+' depths</span>'
-  +(nf?' · '+nf+' filter'+(nf>1?'s':'')+' active':'');
+  let maps=0,depths=0;
+  for(const row of VIS){
+   maps+=row.e.items.length;
+   for(const item of row.e.items)depths+=Math.max(1,Object.keys(manifest[item.i].frames||{}).length);
+  }
+  window.XPVIS=nf?new Set(VIS.map(r=>r.lam)):null;
+  if(F.modo==='tree'&&typeof pintarArbol==='function')try{pintarArbol()}catch(e){}
+  const count=(n,label)=>n+' '+label+(n===1?'':'s');
+  $('xpCount').textContent=[count(VIS.length,'segment'),count(maps,'ink map'),count(depths,'depth')].join(' / ');
   $('xpList').scrollTop=0;pintarVentana()}
  function pintarVentana(){
   const L=$('xpList'),z=$('xpZoom');if(z)z.hidden=true;if(F.modo!=='list')return;
