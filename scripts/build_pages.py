@@ -3,6 +3,7 @@
 import argparse
 import csv
 import gzip
+import hashlib
 import json
 import re
 import shutil
@@ -55,6 +56,20 @@ def build(out, metadata, label_rows):
         html, count = re.subn(pattern, replacement, html, flags=re.DOTALL)
         if count != 1:
             raise ValueError(f"Expected one {marker} block in index.html")
+    # Pages caches individual assets across deployments, including on ordinary page reloads.
+    digest = hashlib.sha256()
+    for name in (
+        "pages.js",
+        "viewer-static.js",
+        "raster-worker.js",
+        "geotiff.js",
+        "css/responsive.css",
+    ):
+        digest.update((out / name).read_bytes())
+    version = digest.hexdigest()[:16]
+    html = html.replace('src="pages.js"', f'src="pages.js?v={version}"').replace(
+        "css/responsive.css?v=20261004-compact-labeling", f"css/responsive.css?v={version}"
+    )
     (out / "index.html").write_text(html, encoding="utf-8")
     (out / "official.json").write_text(
         json.dumps(

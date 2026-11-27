@@ -84,4 +84,4 @@ async function renderTiff(url) {
   ctx.putImageData(pixels, 0, 0);
   return new Response(await canvas.convertToBlob({type: 'image/png'}), {headers: {'Content-Type': 'image/png'}});
 }
-importScripts('./geotiff.js');
+importScripts('./geotiff.js' + self.location.search);

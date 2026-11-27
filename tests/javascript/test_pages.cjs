@@ -10,10 +10,11 @@ const root = 'https://data.example.org/run/';
 const frame = '../catalog/PHerc123/segments/segment/ink-detection/map.tif';
 const entries = [{id: 'series', scroll: 'PHerc123', frames: {0: frame}}];
 
-async function open(source, files) {
+async function open(source, files, version) {
   const html = '<header></header><div id="notice"></div><button id="etiq"></button><a id="download"></a>';
   const dom = new JSDOM(html, {url: page + '?source=' + encodeURIComponent(source), runScripts: 'outside-only'});
   const w = dom.window;
+  if (version) Object.defineProperty(w.document, 'currentScript', {value: {src: page + 'pages.js?v=' + version}});
   w.fetch = async (target, options) => {
     assert.equal(options.credentials, 'omit');
     const url = new URL(target, page);
@@ -31,14 +32,14 @@ async function open(source, files) {
 
 test('official catalog uses its published preview, locks labeling and retains the original TIFF URL', async () => {
   const file = 'PHerc123/segments/segment/ink-detection/map.tif';
-  const w = await open('official', {[page + 'official.json']: {root: root.slice(0,-1), entries, previews: {[file]: 'small.jpg'}}});
+  const w = await open('official', {[page + 'official.json']: {root: root.slice(0,-1), entries, previews: {[file]: 'small.jpg'}}}, 'test-version');
   try {
     const map = w.VISOR_STATIC.select(frame, 'fixed');
     assert.equal(map.original, root + file);
     assert.equal(w.VISOR_STATIC.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
     assert.equal(w.document.querySelector('#etiq').disabled, true);
     assert.equal(w.visorPuedeGuardar, false);
-    assert.equal(w.document.querySelector('script').src, page + 'viewer-static.js');
+    assert.equal(w.document.querySelector('script').src, page + 'viewer-static.js?v=test-version');
   } finally { w.close(); }
 });
 
