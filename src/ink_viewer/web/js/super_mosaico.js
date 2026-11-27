@@ -46,7 +46,7 @@
  /* fuentes: la profundidad elegida en el mosaico (independiente del slider principal) y la union de profundidades */
  let prof=0,imgC=null,imgM=null;const CACHE={};let MAXP={id:null,canvas:null,listo:false};
  const urlDe=dir=>dir?new URL(mapUrl(dir,$('contrast').value),location.href).href:null;
- function obtener(url){if(!url)return null;let g=CACHE[url];if(!g){g=CACHE[url]=new Image();while(Object.keys(CACHE).length>4)delete CACHE[Object.keys(CACHE)[0]];g.onload=()=>pedir();g.src=url}return g}
+ function obtener(url){if(!url)return null;let g=CACHE[url];if(!g){g=CACHE[url]=new Image();g.crossOrigin='anonymous';while(Object.keys(CACHE).length>4)delete CACHE[Object.keys(CACHE)[0]];g.onload=()=>pedir();g.src=url}return g}
  /* union de profundidades REAL: maximo pixel a pixel de todos los centros de la lamina (el manifest de las
     laminas cargadas desde S3 apunta 'maximum' al centro 0, no a una proyeccion). Se calcula una vez por lamina
     en un canvas con composicion 'lighten' (= max por canal) y se cachea. */

@@ -7,7 +7,7 @@
  // In-memory only. Never alter the proxy's persistent cache.
  const IM=new Map(),MAXP=new Map();
  const urlDe=dir=>dir?new URL(mapUrl(dir,$('contrast').value),location.href).href:null;
- function img(url){let g=IM.get(url);if(g)IM.delete(url);else{g=new Image();g.decoding='async';g.src=url}IM.set(url,g);
+ function img(url){let g=IM.get(url);if(g)IM.delete(url);else{g=new Image();g.crossOrigin='anonymous';g.decoding='async';g.src=url}IM.set(url,g);
   while(IM.size>4)IM.delete(IM.keys().next().value);return g}
  function vecinos(g){return Object.keys(g.frames||{}).map(Number).sort((a,b)=>Math.abs(a-Number(slider.value))-Math.abs(b-Number(slider.value))).slice(0,3)}
  function precargar(g){if(!window.HD||!g||!g.frames)return;vecinos(g).forEach(c=>img(urlDe(g.frames[c])))}

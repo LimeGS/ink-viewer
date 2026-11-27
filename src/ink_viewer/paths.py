@@ -29,3 +29,23 @@ def web_asset(name):
 
 # Existing immutable releases remain valid rollback targets.
 LEGACY_RELEASE_FILES = ("index.html", "s3cache_proxy.py", "deploy_runtime.py", "viewerctl.py")
+
+
+VIEWER_TOOLS = (
+    "filtros_pro.js",
+    "super_mosaico.js",
+    "precarga.js",
+    "fallo_visible.js",
+    "explorer_pro.js",
+    "ui_modos.js",
+    "hist_v5.js",
+    "spinner.js",
+    "etiq_extra.js",
+    "hd.js",
+    "etiq_herramientas.js",
+    "guias_medicion.js",
+    "responsive.js",
+    "inksdk.js",
+    "corte.js",
+    "recorte.js",
+)

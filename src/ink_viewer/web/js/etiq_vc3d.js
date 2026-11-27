@@ -62,7 +62,7 @@
    CONTAM_TXT[g.catalogMeta.lam]='TRAINING SHEET · r3f and r3b were trained on this sheet with its AUTOMATIC mask (the one being corrected): their maps here repeat what they learned. BASE never saw '+MEDIDAS_DE+'.';
   }
  };
- document.addEventListener('DOMContentLoaded',()=>{
+ document.addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   /* 1. un lienzo por lamina y profundidad para las tres corridas (trasFrame: clave = hoja.nombre + '|c' + centro) */
   window.visorAliasCorridas();
   /* 2. carga de work-3 cuando el lienzo abre vacio */

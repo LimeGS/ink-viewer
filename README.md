@@ -183,7 +183,23 @@ ssh -N -o ExitOnForwardFailure=yes \
 
 Open the same localhost URL on the laptop and keep both the server and tunnel running. Use matching local and remote ports because the application checks the Host header. If `8797` is occupied, choose another port on both sides and start the viewer with that `--port`.
 
-The guide covers [persistent Linux services](docs/guide.md#deploy-on-your-own-server) and optional [managed releases, previews and rollback](docs/guide.md#managed-releases-previews-and-rollback). A static S3 website alone cannot host the application; its Python API is required.
+The guide covers [persistent Linux services](docs/guide.md#deploy-on-your-own-server) and optional [managed releases, previews and rollback](docs/guide.md#managed-releases-previews-and-rollback). For public datasets, the same viewer also runs on GitHub Pages.
+
+### GitHub Pages
+
+The static build opens the official Vesuvius catalog. Paste a public dataset root into **Open source**, or share a link such as `https://OWNER.github.io/ink-viewer/?source=https%3A%2F%2Fdata.example.org%2Fcatalog%2F`. Serve the index and images over HTTPS and allow cross-origin GET requests from the Pages origin. Public S3 buckets work through their HTTPS endpoint. For a prepared catalog, publish the two JSON files produced by `ink-viewer-manifest` under `_viewer/` alongside the maps.
+
+PNG maps load directly. The official catalog opens published JPEG previews for browsing and links to the original TIFF. **Full resolution** decodes supported TIFFs in the browser over HTTPS or localhost (single-page unsigned grayscale or RGB, up to 16 bits, 32 MiB and 16 million pixels, at most 16,384 pixels per side). Label a native-resolution map locally and export its PNG. Preview grids are browse-only. GPU inference, CT cross-sections, server crops, shared annotation storage and server-backed sources such as the Hugging Face Zarr adapter require the Python service.
+
+To publish, select **Settings → Pages → Build and deployment → GitHub Actions**, then run **Static viewer on GitHub Pages** from the Actions tab. Each build refreshes the official index. To try the same build locally:
+
+```sh
+npm ci
+python3 scripts/build_pages.py build/ink-viewer
+python3 -m http.server 8000 --directory build
+```
+
+Open `http://localhost:8000/ink-viewer/`. For an offline build, pass a saved official `metadata.json` or `metadata.json.gz` with `--metadata`; the published maps still load from their data host.
 
 </details>
 

@@ -212,7 +212,7 @@
     else{FX=fx;fxGuardar();fxAUI();fxPedir()}
     fxPintarPresets()};
    section.append(b)})};
- fetch('alias_presets.json',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(d=>{window.PRESET_ALIAS=d}).catch(()=>{});
+ (globalThis.visorFetchData || fetch)('alias_presets.json',{cache:'no-store'}).then(r=>r.ok?r.json():{}).then(d=>{window.PRESET_ALIAS=d}).catch(()=>{});
  window.fxArmarFiltro=armarFiltro; window.fxNiveles=niveles; window.fxLutPro=lutPro;   /* para super_mosaico.js */
  /* ---- low-friction additions: advanced rows collapsed, named favourites (FX + panes), pane hover toolbar ---- */
  (function(){

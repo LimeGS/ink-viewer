@@ -53,7 +53,7 @@ let HERR='',CLAVE=null,D=vacio(),SEL=null,PEND=null,ARR=null,CUR=null,IGN=null,i
 function vacio(){return {lineas:[],medidas:[],n:0}}
 
 /* ---------- escala ---------- */
-function escala(){const g=hayGrupo()?group:null,c=g&&g.catalogMeta,ver=!(c&&c.physicalScaleVerified===false);
+function escala(){if(window.VISOR_STATIC?.reduced)return {um:null,fuente:'preview',ver:false};const g=hayGrupo()?group:null,c=g&&g.catalogMeta,ver=!(c&&c.physicalScaleVerified===false);
  for(const v of [g&&g.um_por_px,c&&c.um_por_px]){const n=Number(v);if(v!=null&&v!==''&&isFinite(n)&&n>0)return {um:n,fuente:"from the run",ver}}
  const um=window.visorUmPorPixel?visorUmPorPixel(g):+window.VOXEL_UM;return {um:um>0?um:null,fuente:um>0?"from the dataset":"unknown",ver:ver&&um>0}}
 const mmTxt=(px,es)=>es.um>0?(es.ver?'':'≈')+fmt(px*es.um/1000,2)+' mm':fmt(px,1)+' px (scale unknown)';
