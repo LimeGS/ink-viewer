@@ -241,6 +241,8 @@
     }
     window.VISOR_STATIC = {
       readyEvent: 'ink-viewer-ready', reduced: false, resource,
+      // The PHercParis4 map for segment 20230929220926 shows readable text at preview resolution.
+      defaultSeriesId: official ? 'official_0181c8dd4c267c2b5e04' : null,
       setReduced(value) {
         this.reduced = value;
         if (value) wantOriginal = false;

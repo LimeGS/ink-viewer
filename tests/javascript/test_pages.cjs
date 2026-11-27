@@ -34,6 +34,7 @@ test('official catalog uses its published preview, locks labeling and retains th
   const file = 'PHerc123/segments/segment/ink-detection/map.tif';
   const w = await open('official', {[page + 'official.json']: {root: root.slice(0,-1), entries, previews: {[file]: 'small.jpg'}}}, 'test-version');
   try {
+    assert.equal(w.VISOR_STATIC.defaultSeriesId, 'official_0181c8dd4c267c2b5e04');
     const map = w.VISOR_STATIC.select(frame, 'fixed');
     assert.equal(map.original, root + file);
     assert.equal(w.VISOR_STATIC.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
@@ -52,6 +53,7 @@ test('sample and document roots resolve maps, metadata and labels against the ch
     files[root + 'rollos/PHerc123.json'] = {scroll: 'PHerc123', voxel_um: 8.2};
     const w = await open(root, files);
     try {
+      assert.equal(w.VISOR_STATIC.defaultSeriesId, null);
       const folder = layout === 'sample' ? '' : 'catalog/PHerc123/';
       const png = frame.replace(/\.tif$/, '');
       assert.equal(w.VISOR_STATIC.mapUrl(png, 'global'), root + folder + 'segments/segment/ink-detection/map-global.png');
