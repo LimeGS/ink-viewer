@@ -2,6 +2,8 @@
 (async function () {
   const page = new URL(location.href), source = page.searchParams.get('source') || 'official';
   const header = document.querySelector('header'), picker = document.createElement('form');
+  document.getElementById('count').hidden = true;
+  document.getElementById('title').hidden = true;
   const assetQuery = document.currentScript ? new URL(document.currentScript.src).search : '';
   const officialRoot = 'https://vesuvius-challenge-open-data.s3.amazonaws.com';
   const official = ['official', 's3://vesuvius-challenge-open-data', officialRoot].includes(source.replace(/\/+$/, ''));

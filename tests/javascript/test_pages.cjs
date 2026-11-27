@@ -11,7 +11,7 @@ const frame = '../catalog/PHerc123/segments/segment/ink-detection/map.tif';
 const entries = [{id: 'series', scroll: 'PHerc123', frames: {0: frame}}];
 
 async function open(source, files, version) {
-  const html = '<header></header><div id="notice"></div><button id="etiq"></button><a id="download"></a>';
+  const html = '<header><span id="count"></span></header><footer><span id="title"></span></footer><div id="notice"></div><button id="etiq"></button><a id="download"></a>';
   const dom = new JSDOM(html, {url: page + '?source=' + encodeURIComponent(source), runScripts: 'outside-only'});
   const w = dom.window;
   if (version) Object.defineProperty(w.document, 'currentScript', {value: {src: page + 'pages.js?v=' + version}});
@@ -40,6 +40,8 @@ test('official catalog uses its published preview, locks labeling and retains th
     assert.equal(w.VISOR_STATIC.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
     assert.equal(w.document.querySelector('#etiq').disabled, true);
     assert.equal(w.visorPuedeGuardar, false);
+    assert(w.document.querySelector('#count').hidden);
+    assert(w.document.querySelector('#title').hidden);
     assert.equal(w.document.querySelector('script').src, page + 'viewer-static.js?v=test-version');
   } finally { w.close(); }
 });
