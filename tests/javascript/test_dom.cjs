@@ -65,6 +65,14 @@ test('the static explorer hides internal controls and ignores saved filters for 
   assert.equal(el('xpV5m').closest('label').style.display,'none');
   assert.equal(el('xpTally').textContent,'');
   assert(!el('xp').classList.contains('xpHasArea'));
+  assert.match(w.document.querySelector('#xpList .r .n').textContent,/PHerc0175A · s/);
+  input(w,'xpQ','PHerc0175A');
+  assert.equal(el('xpCount').textContent,'1 segment / 1 ink map / 2 depths');
+  input(w,'xpView','mod','change');
+  await settle();
+  const treeLabel=w.document.querySelector('#tree .lam');
+  assert.match(treeLabel.textContent,/PHerc0175A · s/);
+  assert.equal(treeLabel.querySelector('small'),null);
   vm.runInContext("CG={s:{cm2:6,frac_ct:0.95}}",context);
   w.xpRepintar();
   assert.deepEqual(sorts(),['area','ct','name']);

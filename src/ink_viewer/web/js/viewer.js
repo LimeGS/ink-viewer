@@ -526,9 +526,15 @@ const segRuta=g=>{for(const f of Object.values(g.frames||{})){const m=/catalog\/
 const SEG_ROLLOS=new Map();manifest.forEach(g=>{const s=segRuta(g);if(s){if(!SEG_ROLLOS.has(s.seg))SEG_ROLLOS.set(s.seg,new Set());SEG_ROLLOS.get(s.seg).add(s.scroll)}});
 const segmentKey=s=>SEG_ROLLOS.get(s.seg)?.size>1?s.scroll+'/'+s.seg:s.seg;
 const filaDe=g=>{const s=segRuta(g);return s?segmentKey(s):meta(g).lam};
+function segmentDisplayName(entry){
+ const {lam:name,scroll}=entry;
+ if(scroll==='PHercCustom'||!/^PHerc[0-9A-Za-z]+$/.test(scroll||''))return name;
+ if(name===scroll||['/','-','_',' '].some(separator=>name.startsWith(scroll+separator)))return name;
+ return scroll+' · '+name;
+}
 const LAM=new Map(),FILA_DE_HOJA={};
 manifest.forEach((g,i)=>{const t=meta(g),s=segRuta(g),k=s?segmentKey(s):t.lam;let e=LAM.get(k);
- if(!e)LAM.set(k,e={lam:k,cm:t.cm,z:t.z,est:t.est,fam:t.fam,catalog:true,scroll:s?.scroll||g.catalogMeta?.scroll||null,items:[],hojas:[]});
+ if(!e)LAM.set(k,e={lam:k,cm:t.cm,z:t.z,est:t.est,fam:t.fam,catalog:true,scroll:s?.scroll||g.scroll||g.catalogMeta?.scroll||null,items:[],hojas:[]});
  if(e.cm==null)e.cm=t.cm;if(!e.z)e.z=t.z;if(!e.est)e.est=t.est;e.catalog=e.catalog&&!!g.catalogMeta;
  if(!e.hojas.includes(t.lam))e.hojas.push(t.lam);FILA_DE_HOJA[t.lam]=k;
  e.items.push({i,modelo:t.modelo,cara:t.cara,hoja:t.lam})});
@@ -697,17 +703,17 @@ const etapasTxt=e=>ETAPAS.map(x=>x.g+ET_GLIFO[x.calc(e)]).join(' ');
 const etapasTitulo=e=>ETAPAS.map(x=>x.t+': '+({true:'pass',false:'fail',null:'unmeasured'})[x.calc(e)]).join('\n')+'\n\n'+cgTitulo(e);
 function pintarArbol(){if($('tree').hidden||$('tree').style.display==='none')return;const q=$('buscar').value.trim().toLowerCase(),t=$('tree'),act=lamActual(),actMod=group?meta(group).modelo:null;t.innerHTML='';
  const passSet=new Set();
- NODOS.forEach(n=>{if((!q||n.e.lam.toLowerCase().includes(q))&&etapasOK(n.e)&&(!window.XPVIS||window.XPVIS.has(n.e.lam)))passSet.add(n.e.lam)});
+ NODOS.forEach(n=>{if((!q||segmentDisplayName(n.e).toLowerCase().includes(q))&&etapasOK(n.e)&&(!window.XPVIS||window.XPVIS.has(n.e.lam)))passSet.add(n.e.lam)});
  const evEl=$('etapasVisible');if(evEl)evEl.textContent=passSet.size+' of '+LAM.size+' laminae visible with this filter';
  const hay=n=>n.e.lam===act&&n.mod===actMod;let prim=true;
  ARB.forEach((sub,nom1)=>{
-  const pasa=n=>(!q||n.e.lam.toLowerCase().includes(q))&&(n.msk?true:etapasOK(n.e))&&(!window.XPVIS||window.XPVIS.has(n.e.lam));
+  const pasa=n=>(!q||segmentDisplayName(n.e).toLowerCase().includes(q))&&(n.msk?true:etapasOK(n.e))&&(!window.XPVIS||window.XPVIS.has(n.e.lam));
   const vis=[...sub].map(([b,ns])=>[b,ns.filter(pasa)]).filter(p=>p[1].length);
   if(!vis.length)return;
   const distintas=ns=>new Set(ns.map(n=>(n.e&&n.e.lam)||n.lam||n)).size;
   const tot=distintas(vis.flatMap(p=>p[1]));
   const d=document.createElement('details');d.open=!!q||prim||vis.some(p=>p[1].some(hay));prim=false;
-  const su=document.createElement('summary');su.textContent=nom1+' ('+tot+')';d.append(su);
+  const su=document.createElement('summary');su.textContent=(vistaModo==='malla'&&LAM.has(nom1)?segmentDisplayName(LAM.get(nom1)):nom1)+' ('+tot+')';d.append(su);
   vis.forEach(([nom2,ns])=>{let d2;
    if(nom2===''){d2=d}  /* vista por modelo: sin segundo nivel */
    else{d2=document.createElement('details');d2.open=!!q||ns.some(hay);
@@ -728,15 +734,18 @@ function pintarArbol(){if($('tree').hidden||$('tree').style.display==='none')ret
       setTimeout(()=>mskCargar(n.msk),400)};
      d2.append(b); return}
     const e=n.e,ct=(e.hojas||[e.lam]).some(h=>esContam(h,n.mod)),b=document.createElement('button');b.className='lam'+(hay(n)?' sel':'')+(ct?' contam':'');
-    b.textContent=(vistaModo==='malla'?(MODCORTO[n.mod]||n.mod)+' · '+(n.cara||''):e.lam);
+    b.textContent=(vistaModo==='malla'?(MODCORTO[n.mod]||n.mod)+' · '+(n.cara||''):segmentDisplayName(e));
+    if(vistaModo==='malla')b.title=segmentDisplayName(e);
     if(ct){b.title=CONTAM_TIT;const g=document.createElement('i');g.className='tag';g.textContent='TRAINING';b.append(g)}
     const s=document.createElement('small');
     const lg=LEG[e.lam], lgTxt=lg?('v5 '+lg.max.toFixed(3)+' @c'+lg.mejor_centro):'';
-    s.textContent=vistaModo==='pos'
+    s.textContent=window.VISOR_STATIC
+      ?[e.cm!=null?e.cm.toFixed(2)+' cm²':'',e.z].filter(Boolean).join(' · ')
+      :vistaModo==='pos'
       ?[e.cm!=null?e.cm.toFixed(2)+' cm²':'',lineaPos(e),lgTxt,etapasTxt(e)].filter(Boolean).join(' · ')
       :[e.cm!=null?e.cm.toFixed(2)+' cm²':'',e.est,cgTxt(e),e.z,lgTxt,etapasTxt(e)].filter(Boolean).join(' · ');
     if(lg)s.title=(s.title?s.title+'\n\n':'')+'Legibility index v5-R2B (EXPERIMENTAL): maximum '+lg.max.toFixed(3)+' over 512-px windows at centre '+lg.mejor_centro+'.\nIt is an UNCALIBRATED RANKING: it orders laminae, it does not claim there are letters.';
-    if(!ct)s.title=etapasTitulo(e);
+    if(!ct&&!window.VISOR_STATIC)s.title=etapasTitulo(e);
     if(vistaModo==='pos'&&!ct)b.title=tituloPos(e);
     if(s.textContent)b.append(s);
     b.onclick=()=>irA(e,n.mod);d2.append(b)};
