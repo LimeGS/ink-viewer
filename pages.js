@@ -10,7 +10,7 @@
   const labels = source === 'ink-labels';
   const modes = document.createElement('select'), input = document.createElement('input'), open = document.createElement('button');
   modes.setAttribute('aria-label', 'Data source');
-  for (const [name, key] of [['All official maps', 'official'], ['All ink-labels', 'ink-labels'], ['Custom HTTP / S3', 'custom']]) {
+  for (const [name, key] of [['All official maps', 'official'], ['VSKinox Label Collection', 'ink-labels'], ['Custom HTTP / S3', 'custom']]) {
     modes.add(new Option(name, key));
   }
   modes.value = official ? 'official' : labels ? 'ink-labels' : 'custom';
