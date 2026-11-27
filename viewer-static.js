@@ -1011,7 +1011,7 @@ function trasFrame(w,h){cargandoOff();
  if(!group)return;
  curW=w||curW||im.naturalWidth;curH=h||curH||im.naturalHeight;
  if(!curW)return;
- if(globalThis.VISOR_STATIC?.reduced){maskReady=false;montarCapas(null);return}
+ if(globalThis.VISOR_STATIC?.reduced){montarCapas(null);return}
  /* one mask per DEPTH (12-sep): the sheet key carries the centre, so changing depth swaps the working mask (IndexedDB) */
  const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);   /* 25-sep: clave de la grilla (ver claveLienzo) */
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}
@@ -1065,7 +1065,7 @@ function dibujarRegion(){let r=$('regbox');
  r.setAttribute('x',Math.min(regIni[0],regFin[0]));r.setAttribute('y',Math.min(regIni[1],regFin[1]));
  r.setAttribute('width',Math.abs(regFin[0]-regIni[0]));r.setAttribute('height',Math.abs(regFin[1]-regIni[1]))}
 
-function modoEtiq(v){if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
+function modoEtiq(v){if(v)globalThis.VISOR_STATIC?.prepareLabel?.();if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
  if(window.requireAnnotationHD)window.requireAnnotationHD(v);
  $('etiq').classList.toggle('active',v);$('etiq').setAttribute('aria-pressed',String(v));
  $('mask').style.display=v?'block':'none';espejarMascara();syncHash()}
@@ -2086,6 +2086,38 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  };
  $('exp').textContent='download pair';
  $('exp').title='Download inklabels and supervision PNGs from one snapshot, with matching depth and grid metadata. Allow multiple downloads in the browser.';
+ if(window.VISOR_STATIC){
+  $('exp').textContent='Download masks';
+  if(window.VISOR_STATIC.hasPublishedLabels)window.VISOR_STATIC.importPublishedLabel=async()=>{
+   const url=window.VISOR_STATIC.publishedLabel, target=destinoMascara();
+   if(!url||!target||!window.annotationImageReady())throw new Error('Wait for the native label and mask to load.');
+   if(!window.mascaraVacia()&&!confirm('Replace the working mask with the published label? You can undo this.'))return;
+   const revision=window.revisionMascara(target.info);
+   const response=await fetch(url,{credentials:'omit'});
+   if(!response.ok)throw new Error('Could not load the published label (HTTP '+response.status+').');
+   const pixels=await leerPngMascara(await response.blob(),target.w,target.h);
+   if(!window.annotationImageReady()||url!==window.VISOR_STATIC.publishedLabel||!destinoVigente(target)||
+      revision!==window.revisionMascara(target.info))
+    throw new Error('The active label changed during loading. Try again on the current label.');
+   const out=new ImageData(target.w,target.h);
+   for(let i=0;i<pixels.data.length;i+=4){
+    const value=pixels.data[i];
+    if(pixels.data[i+3]!==255||pixels.data[i+1]!==value||pixels.data[i+2]!==value||![0,1,2,255].includes(value))
+     throw new Error('Unexpected class in the published label.');
+    if(value===0||value===1){out.data.set(value===1?COLOR.tinta:COLOR.no,i);out.data[i+3]=255}
+   }
+   if(reemplazarMascara(out,target))msg('Published label loaded. Undo restores the previous mask.');
+  };
+  window.VISOR_STATIC.captureMaskPair=async()=>{
+   if(!window.annotationImageReady())throw new Error('Wait for the native image and mask to load.');
+   const snapshot=capturar();
+   if(snapshot.vacia)throw new Error('Paint or load a label before uploading.');
+   const blobs=await codificar(snapshot);
+   const {scroll,segmento:segment,profundidad:depth,par_id:pairId}=snapshot.corrida;
+   return {files:snapshot.nombres.map((name,index)=>({name,blob:blobs[index]})), scroll, segment, depth, pairId};
+  };
+  return;
+ }
  const base64=b=>new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=()=>mal(r.error||new Error('Could not read PNG'));r.readAsDataURL(b)});
  // ponytail: one upload queue preserves snapshot order; per-destination queues if throughput matters.
  let subiendo=Promise.resolve();
@@ -2433,7 +2465,20 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
   [['gamma0.4',{gamma:0.4}],['gamma3',{gamma:3}],['contrast4',{contraste:4}],['levels 0-60',{negro:0,blanco:60}],['levels 40-120',{negro:40,blanco:120}],['levels 100-255',{negro:100,blanco:255}],
    ['p10 inv',{auto:'p10',invertir:true}],['S k40 c.6',{curva:40,centro:0.6}],['S k40 c.3',{curva:40,centro:0.3}],['turbo raw',{paleta:'turbo'}],['diverge p10',{paleta:'diverge',auto:'p10'}],['hot S8',{paleta:'hot',curva:8,centro:0.5,auto:'p2'}]]
    .forEach(([t,fx])=>add('Extremes',t,fx));
-  return V}
+  // Put the presets that preserve readable strokes before the more aggressive experiments.
+  const readingOrder = [
+   'raw · p2', 'raw · S k8 · viridis', 'raw · S k30 c.35 · magma', 'raw · post5 · diverge',
+   'unsharp3 r12 · p2', 'unsharp3 r12 · S k8 · viridis', 'unsharp3 r12 · S k30 c.35 · magma',
+   'unsharp3 r12 · post5 · diverge', 'post8 magma S8', 'contrast4',
+   'threshold120', 'threshold150', 'threshold180', 'gamma0.4', 'gamma3',
+   'levels 0-60', 'levels 40-120', 'levels 100-255', 'S k40 c.6', 'S k40 c.3',
+   'p10 inv', 'post3 diverge', 'diverge p10', 'turbo raw', 'hot S8',
+   'relief', 'relief S30', 'lap x2', 'sobel', 'blend50 DoG8', 'blend30 PA15 inv',
+   'raw · S k30 · turbo · inv', 'unsharp3 r12 · S k30 · turbo · inv'
+  ];
+  const rank = new Map(readingOrder.map((name, index) => [name, index]));
+  const position = variant => rank.get(variant.t) ?? readingOrder.length;
+  return V.sort((a,b) => position(a) - position(b))}
  /* ---- estado y DOM ---- */
  let ov=null,grid=null,defs=null,V=[],cx=0,cy=0,z=0.5,tam=300,raf=0,zDefs=-1,drag=null;
  /* 25-sep: orientacion de vista (corrida corregida + voltear a mano, index.html). Las baldosas muestran la VISTA: el
@@ -4474,7 +4519,8 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  const fileBody=files.lastElementChild;
  const format=document.createElement('label');format.className='labelFormat';format.append('PNG format',$('impFormato'));
  const imports=document.createElement('div');imports.className='fila';imports.append($('imp'),$('htCargar'));
- const exports=document.createElement('div');exports.className='fila';exports.append($('verPng'),$('guardarTodasMascaras'));
+ const exports=document.createElement('div');exports.className='fila';exports.append($('verPng'));
+ if(!window.VISOR_STATIC)exports.append($('guardarTodasMascaras'));
  fileBody.prepend(format,imports,$('impProp'),exports);
  const jsonActions=document.createElement('div');jsonActions.className='fila';jsonActions.append($('copJson'),$('pegJson'));
  const json=section('labelJson','Mask JSON',[jsonActions,$('ta')]);fileBody.append(json);
@@ -4486,8 +4532,8 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  for(const {heading,nodes} of groups.values())sections.append(...[heading].filter(Boolean),...nodes);
  const warnings=document.createElement('div');warnings.id='labelWarnings';warnings.setAttribute('role','status');warnings.hidden=true;
  const footer=document.createElement('div');footer.id='labelFooter';
- const actions=document.createElement('div');actions.className='fila';actions.append($('guardarMascaraServidor'),$('exp'));
- const storage=document.createElement('small');storage.textContent=visorPuedeGuardar?'Inklabels + supervision PNGs':'Read-only annotation storage';
+ const actions=document.createElement('div');actions.className='fila';if(!window.VISOR_STATIC)actions.append($('guardarMascaraServidor'));actions.append($('exp'));
+ const storage=document.createElement('small');storage.hidden=!!window.VISOR_STATIC;storage.textContent=visorPuedeGuardar?'Inklabels + supervision PNGs':'Read-only annotation storage';
  const status=document.createElement('div');status.id='labelStatus';status.setAttribute('role','status');
  ['msg','htCorridaEst','htEstado','gmEstado'].forEach(id=>{const e=$(id);if(e)status.append(e)});
  footer.append(actions,storage,status);panel.replaceChildren(header,$('htPend'),warnings,brush,sections,footer);panel.classList.add('labelCompact');
@@ -4500,3 +4546,174 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  const syncModes=()=>modes.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.classList.contains('on'))));
  new MutationObserver(syncModes).observe(modes,{subtree:true,attributes:true,attributeFilter:['class']});syncModes();reveal();
 },{once:true});
+
+;
+addEventListener(window.VISOR_STATIC.readyEvent, () => {
+  const viewer = window.VISOR_STATIC;
+  const download = document.getElementById('exp');
+  if (!viewer?.captureMaskPair || !download) return;
+  const savedMask = document.getElementById('htCargar');
+  if (savedMask) savedMask.hidden = true;
+
+  if (viewer.importPublishedLabel) {
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.textContent = 'Load published label';
+    load.onclick = async () => {
+      load.disabled = true;
+      try {
+        await viewer.importPublishedLabel();
+      } catch (error) {
+        msg(error.message);
+      } finally {
+        load.disabled = false;
+      }
+    };
+    download.before(load);
+  }
+
+  const upload = document.createElement('button');
+  upload.type = 'button';
+  upload.textContent = 'Upload masks';
+  download.after(upload);
+
+  const dialog = document.createElement('dialog');
+  dialog.className = 'staticMaskUpload';
+  dialog.setAttribute('aria-labelledby', 'maskUploadTitle');
+  dialog.innerHTML = `
+    <form autocomplete="off">
+      <h2 id="maskUploadTitle">Upload masks</h2>
+      <p class="maskUploadFiles"></p>
+      <label>Destination
+        <select name="destination">
+          <option value="hf">Hugging Face</option>
+          <option value="s3">Amazon S3</option>
+        </select>
+      </label>
+      <fieldset data-destination="hf">
+        <legend>Hugging Face dataset</legend>
+        <label>Dataset <input name="dataset" placeholder="owner/dataset" required></label>
+        <label>Write token <input name="token" type="password" required></label>
+      </fieldset>
+      <fieldset data-destination="s3" hidden disabled>
+        <legend>Presigned HTTPS PUT URLs</legend>
+        <label>Ink mask <input name="inkUrl" type="password" required></label>
+        <label>Supervision mask <input name="supervisionUrl" type="password" required></label>
+      </fieldset>
+      <p role="status" class="maskUploadStatus"></p>
+      <div class="maskUploadActions">
+        <button type="button">Close</button>
+        <button type="submit">Upload pair</button>
+      </div>
+    </form>`;
+  document.body.append(dialog);
+
+  const form = dialog.querySelector('form'), fields = form.elements;
+  const groups = [...form.querySelectorAll('fieldset')];
+  const status = dialog.querySelector('.maskUploadStatus');
+  const close = dialog.querySelector('button[type=button]');
+  const submit = dialog.querySelector('button[type=submit]');
+  let snapshot, sending = false, uploaded = false;
+  const sentToS3 = new Map();
+
+  function updateFields() {
+    fields.destination.disabled = sending || uploaded;
+    for (const group of groups) {
+      group.hidden = group.dataset.destination !== fields.destination.value;
+      group.disabled = group.hidden || sending || uploaded;
+    }
+    submit.disabled = sending || uploaded;
+    close.disabled = sending;
+  }
+  fields.destination.onchange = () => { status.textContent = ''; updateFields(); };
+  close.onclick = () => dialog.close();
+  dialog.oncancel = event => { if (sending) event.preventDefault(); };
+  dialog.onclose = () => {
+    snapshot = null;
+    fields.token.value = fields.inkUrl.value = fields.supervisionUrl.value = '';
+    sentToS3.clear();
+  };
+  upload.onclick = async () => {
+    upload.disabled = true;
+    try {
+      snapshot = await viewer.captureMaskPair();
+      uploaded = false;
+      dialog.querySelector('.maskUploadFiles').textContent = snapshot.files.map(file => file.name).join(' and ');
+      status.textContent = '';
+      updateFields();
+      dialog.showModal();
+    } catch (error) {
+      msg(error.message);
+    } finally {
+      upload.disabled = false;
+    }
+  };
+
+  function signedPutUrl(value) {
+    let url;
+    try { url = new URL(value.trim()); } catch { /* Report the same error for all invalid URLs. */ }
+    if (!url || url.protocol !== 'https:' || url.username || url.password || url.hash ||
+        !url.searchParams.get('X-Amz-Signature')) {
+      throw new Error('Enter a valid S3 presigned HTTPS PUT URL for each file.');
+    }
+    return url;
+  }
+
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (sending || uploaded || !snapshot) return;
+    const destination = fields.destination.value;
+    sending = true;
+    updateFields();
+    status.textContent = 'Uploading…';
+    try {
+      if (destination === 'hf') {
+        const dataset = fields.dataset.value.trim();
+        if (!/^[\w.-]+\/[\w.-]+$/.test(dataset) || dataset.split('/').some(part => /^\.+$/.test(part))) {
+          throw new Error('Enter an existing dataset in owner/dataset format.');
+        }
+        const token = fields.token.value.trim();
+        if (!/^hf_[a-zA-Z0-9]+$/.test(token)) throw new Error('Enter a Hugging Face write token.');
+        const { commitMaskPair } = await import(viewer.maskUploadModule);
+        const { scroll, segment, depth, pairId, files } = snapshot;
+        const folder = ['annotations', scroll, segment, 'depth-' + depth, pairId]
+          .map(part => String(part).replace(/[^a-zA-Z0-9_-]/g, '_')).join('/');
+        try {
+          await commitMaskPair({ dataset, token, folder, files });
+        } catch {
+          throw new Error('Hugging Face upload failed. Check the dataset, token permissions and network access.');
+        }
+      } else {
+        const urls = [fields.inkUrl, fields.supervisionUrl].map(input => signedPutUrl(input.value));
+        if (urls[0].origin + urls[0].pathname === urls[1].origin + urls[1].pathname) {
+          throw new Error('Use two different S3 object keys.');
+        }
+        const results = await Promise.all(snapshot.files.map(async ({ name, blob }, index) => {
+          const url = urls[index].href;
+          if (sentToS3.get(name) === url) return null;
+          try {
+            const response = await fetch(url, { method: 'PUT', body: blob, credentials: 'omit', redirect: 'error' });
+            if (!response.ok) return name + ' (HTTP ' + response.status + ')';
+            sentToS3.set(name, url);
+            return null;
+          } catch {
+            return name + ' (check bucket CORS and network access)';
+          }
+        }));
+        const failures = results.filter(Boolean);
+        if (failures.length) {
+          throw new Error((2 - failures.length) + ' of 2 files uploaded. Retry ' + failures.join(', ') + '.');
+        }
+      }
+      uploaded = true;
+      fields.token.value = fields.inkUrl.value = fields.supervisionUrl.value = '';
+      sentToS3.clear();
+      status.textContent = 'Both masks uploaded.';
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      sending = false;
+      updateFields();
+    }
+  };
+}, { once: true });

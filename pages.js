@@ -243,13 +243,25 @@
     }
     window.VISOR_STATIC = {
       readyEvent: 'ink-viewer-ready', reduced: false, resource,
+      hasPublishedLabels: labels && decode,
+      maskUploadModule: new URL('mask-hub.js' + assetQuery, page).href,
+      prepareLabel() {
+        if (labels && decode && style.value === 'preview') {
+          style.value = 'A';
+          show(true);
+        } else if (!labels && this.reduced && !full.hidden && !document.getElementById('etiq').disabled) {
+          wantOriginal = true;
+          show(true);
+        }
+      },
       // The PHercParis4 map for segment 20230929220926 shows readable text at preview resolution.
       defaultSeriesId: official ? 'official_0181c8dd4c267c2b5e04' : null,
-      setReduced(value) {
+      setReduced(value, canOpenNative = false) {
         this.reduced = value;
         if (value) wantOriginal = false;
         full.textContent = wantOriginal ? 'Show preview' : 'Full resolution';
-        const label = document.getElementById('etiq'); label.disabled = value;
+        const label = document.getElementById('etiq'); label.disabled = value && !canOpenNative;
+        label.title = label.disabled ? 'Labeling requires a supported native-resolution image.' : '';
         if (value && etiqOn) modoEtiq(false);
       },
       select(frame, contrast) {
@@ -258,9 +270,10 @@
           entryLink.href = new URL('./', frame).href.replace('/resolve/main/', '/tree/main/');
           labelLegend.textContent = overview ? '' : 'Yellow: ink · blue: background · grey: ignore · black: outside. ';
           document.getElementById('download').textContent = overview ? 'Open comparison ↗' : 'Open raw label ↗';
-          this.setReduced(true);
-          return {original: labelURL(frame), preview: true, caption: overview
-            ? 'Published comparison · CT | label A | label C' : 'Published mask · label style ' + style.value};
+          this.publishedLabel = overview ? null : labelURL(frame);
+          this.setReduced(overview, decode);
+          return {original: labelURL(frame), preview: overview,
+            caption: 'Published comparison · CT | label A | label C'};
         }
         const original = image(frame, contrast), tiff = /\.tiff?$/i.test(new URL(original).pathname);
         if (selectedURL !== original) { selectedURL = original; wantOriginal = !builtIn; }
@@ -268,7 +281,7 @@
         const usePreview = !!(fallback && (!wantOriginal || !decode));
         full.hidden = !(tiff && fallback && decode);
         document.getElementById('download').textContent = tiff ? 'Open TIFF ↗' : 'Open image ↗';
-        this.setReduced(usePreview);
+        this.setReduced(usePreview, !full.hidden);
         return {original, preview: usePreview, fallback};
       },
       mapUrl(frame, contrast, scale) {
