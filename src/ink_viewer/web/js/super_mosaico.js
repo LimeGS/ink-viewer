@@ -33,7 +33,20 @@
   [['gamma0.4',{gamma:0.4}],['gamma3',{gamma:3}],['contrast4',{contraste:4}],['levels 0-60',{negro:0,blanco:60}],['levels 40-120',{negro:40,blanco:120}],['levels 100-255',{negro:100,blanco:255}],
    ['p10 inv',{auto:'p10',invertir:true}],['S k40 c.6',{curva:40,centro:0.6}],['S k40 c.3',{curva:40,centro:0.3}],['turbo raw',{paleta:'turbo'}],['diverge p10',{paleta:'diverge',auto:'p10'}],['hot S8',{paleta:'hot',curva:8,centro:0.5,auto:'p2'}]]
    .forEach(([t,fx])=>add('Extremes',t,fx));
-  return V}
+  // Put the presets that preserve readable strokes before the more aggressive experiments.
+  const readingOrder = [
+   'raw · p2', 'raw · S k8 · viridis', 'raw · S k30 c.35 · magma', 'raw · post5 · diverge',
+   'unsharp3 r12 · p2', 'unsharp3 r12 · S k8 · viridis', 'unsharp3 r12 · S k30 c.35 · magma',
+   'unsharp3 r12 · post5 · diverge', 'post8 magma S8', 'contrast4',
+   'threshold120', 'threshold150', 'threshold180', 'gamma0.4', 'gamma3',
+   'levels 0-60', 'levels 40-120', 'levels 100-255', 'S k40 c.6', 'S k40 c.3',
+   'p10 inv', 'post3 diverge', 'diverge p10', 'turbo raw', 'hot S8',
+   'relief', 'relief S30', 'lap x2', 'sobel', 'blend50 DoG8', 'blend30 PA15 inv',
+   'raw · S k30 · turbo · inv', 'unsharp3 r12 · S k30 · turbo · inv'
+  ];
+  const rank = new Map(readingOrder.map((name, index) => [name, index]));
+  const position = variant => rank.get(variant.t) ?? readingOrder.length;
+  return V.sort((a,b) => position(a) - position(b))}
  /* ---- estado y DOM ---- */
  let ov=null,grid=null,defs=null,V=[],cx=0,cy=0,z=0.5,tam=300,raf=0,zDefs=-1,drag=null;
  /* 25-sep: orientacion de vista (corrida corregida + voltear a mano, index.html). Las baldosas muestran la VISTA: el
