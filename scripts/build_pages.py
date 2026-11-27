@@ -38,7 +38,7 @@ def build(out, metadata, label_rows):
     browser = [
         tool
         for tool in VIEWER_TOOLS
-        if tool not in {"inksdk.js", "corte.js", "recorte.js", "hd.js"}
+        if tool not in {"inksdk.js", "corte.js", "recorte.js", "hd.js", "hist_v5.js"}
     ]
     scripts = ["rollo_visor.js", "etiquetar.js", "etiq_vc3d.js", "viewer.js", *browser]
     (out / "viewer-static.js").write_text(

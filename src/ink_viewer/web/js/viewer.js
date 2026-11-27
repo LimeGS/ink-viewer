@@ -31,7 +31,7 @@ const catalogTotalSeries=manifest.length;
 /* 25-sep: &unverified=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
 function mostrarSinVerificar(entries,source,saved,hash){
  const fallback=!!source&&(globalThis.VISOR_STATIC||entries.some(g=>g.catalogMeta))&&!entries.some(hasVerifiedMeshAssociation);
- return hash==='1'||(saved!==null?saved==='1':fallback);
+ return !!globalThis.VISOR_STATIC||hash==='1'||(saved!==null?saved==='1':fallback);
 }
 function normalizeViewerLink(url) {
  const legacy={hoja:'sheet',cara:'face',modelo:'model',serie:'series',centro:'depth',etiq:'label',
@@ -1361,7 +1361,7 @@ var LEG={};
    campana_fl22/catalogo/v5_visor.py en work-3, copiado a all-gallery/). LEG_V5M = las entradas con por_modelo (auto + fl22)
    para el selector «v5 de» del explorador; sin el archivo el visor queda como antes. */
 var LEG_V5M={};
-Promise.all(['legibilidad.json','../catalog/_viewer/legibilidad-auto.json','legibilidad-fl22.json','../catalog/'+ROLLO+'/_viewer/legibilidad-auto.json'].map(url=>(globalThis.visorFetchData || fetch)(url,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([base,auto,fl22,sample])=>{
+if(!window.VISOR_STATIC)Promise.all(['legibilidad.json','../catalog/_viewer/legibilidad-auto.json','legibilidad-fl22.json','../catalog/'+ROLLO+'/_viewer/legibilidad-auto.json'].map(url=>(globalThis.visorFetchData || fetch)(url,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([base,auto,fl22,sample])=>{
  LEG_V5M={...(auto&&auto.laminas||{}),...(fl22&&fl22.laminas||{}),...(sample&&sample.laminas||{})};
  const d=base||auto||fl22||sample?{laminas:{...(auto&&auto.laminas||{}),...(fl22&&fl22.laminas||{}),...(base&&base.laminas||{}),...(sample&&sample.laminas||{})}}:null;
  if(d&&d.laminas){LEG=d.laminas;const seg={};LAM.forEach(e=>{const b=[e.lam,...e.hojas].map(h=>LEG[h]).filter(l=>l&&Number.isFinite(l.max)).sort((a,b)=>b.max-a.max)[0];if(b)seg[e.lam]=b});Object.assign(LEG,seg);CARPETAS.forEach(v=>v.sort(compareV5Lamina));ARB=armar(vistaModo);pintarArbol();if(window.xpRepintar)window.xpRepintar();if(window.v5HistRepintar)window.v5HistRepintar();}}).catch(()=>{});

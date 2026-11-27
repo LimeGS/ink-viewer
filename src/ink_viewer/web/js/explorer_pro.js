@@ -6,6 +6,7 @@
    available behind the "Tree" button. Reads the viewer's own data (LAM, CG, LEG, MSK) - nothing duplicated. */
 (function(){
  if(typeof LAM==='undefined'||typeof irA!=='function'){console.warn('explorer_pro: viewer globals missing');return}
+ const publicViewer=!!window.VISOR_STATIC;
  let OBJ=null,EXCL={},PROPS=new Set();if (!window.VISOR_STATIC) fetch('/api/propuestas',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{PROPS=new Set(l);pintar()}).catch(()=>{});
 let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{MASC=new Set(l);pintar()}).catch(()=>{});
 (globalThis.visorFetchData || fetch)('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d){OBJ=d.objetivo;EXCL=d.excluir||{};pintar()}}).catch(()=>{});
@@ -91,7 +92,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
   ['cont','Cont','C','parametrisation continuity: no jumps between neighbouring cells'],
   ['a4','Area','A','area ≥ 4 cm², the First Letters bar (a submission gate, not a training one)']];
  const chips=GATES.map(([k,n])=>[k,n]);const flags=[['rep','repaired'],['piece','piece'],['lab','mask'],['star','★']];
- panel.innerHTML='<div class="row" id="xpSearch"><input type="search" id="xpQ" placeholder="Search segment, lamina or family" aria-label="Search segments" autocomplete="off"><select id="xpRollo" aria-label="Scroll"><option value="">All scrolls</option>'+[...new Set([ROLLO_CORTO,'1218','0306B','0800'])].map(r=>'<option value="'+r+'">'+r+'</option>').join('')+'</select></div>'+
+ panel.innerHTML='<div class="row" id="xpSearch"><input type="search" id="xpQ" placeholder="Search segment, lamina or family" aria-label="Search segments" autocomplete="off"><select id="xpRollo" aria-label="Scroll"><option value="">All scrolls</option>'+(publicViewer?[]:[...new Set([ROLLO_CORTO,'1218','0306B','0800'])]).map(r=>'<option value="'+r+'">'+r+'</option>').join('')+'</select></div>'+
   '<div class="row" id="xpOrder"><label>Sort <select id="xpSort"><option value="area_v5">Area, then v5</option><option value="area">Area</option><option value="sizescore">Size × score</option><option value="v5">v5</option><option value="iso">Isometry</option><option value="z">z</option><option value="ct">CT %</option><option value="name">Name</option></select></label><button id="xpDir" class="pre" aria-label="Reverse sort direction">↓</button><label>v5 <select id="xpV5m" title="Which v5 feeds the column, filter and sorting. Percentiles are within scroll and model. v5 R2B is experimental: ranking, not certification."><option value="">Best run</option><option value="base">BASE</option><option value="ra_congelado">R-A congelado</option><option value="r3f">r3f</option><option value="r3f_evo">r3f-evo (R-D)</option><option value="pct">Percentile</option></select></label></div>'+
   '<div id="xpControls"><div class="row" id="xpPre"><select id="xpPreset" aria-label="Apply explorer preset"><option value="">Apply preset…</option>'+PRE.slice(0,-1).map(([t,,d],i)=>'<option value="'+i+'" title="'+d+'">'+t+'</option>').join('')+'</select><button id="xpClear" class="pre">Clear</button></div><div id="xpActive" class="row" aria-label="Active filters" hidden></div>'+
   '<div class="xpSections"><details id="xpFilters"><summary>Filters <span id="xpFilterCount"></span></summary><div class="xpFilterBody"><fieldset><legend>Quality gates</legend><div id="xpChips" class="xpFields"></div></fieldset>'+
@@ -99,6 +100,28 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
   '<fieldset><legend>Annotations & status</legend><div id="xpFlags" class="xpFields"></div><div class="row xpChecks"><label><input type="checkbox" id="xpC17"> 17 centres</label><label><input type="checkbox" id="xpUnseen"> Unseen</label></div></fieldset></div></details>'+
   '<details id="xpStats"><summary>Data & counts</summary><div class="row xpChecks"><label title="Also list series whose mesh association is unverified. Reloads the page."><input type="checkbox" id="xpSinVer"> Unverified meshes</label><button id="xpWarm" class="pre" title="Download every depth of the listed segments into the proxy cache. Click again to stop.">Warm cache</button></div><div id="xpTally" class="tally"></div></details></div></div>'+
   '<div class="row" id="xpResults"><b id="xpCount"></b><span class="lbl" id="xpHint">j/k move · Enter open · s star</span></div><div id="xpHead"><span></span><span>segment</span><span class="num"><i class="hh" data-c="1"></i>cm²</span><span class="num"><i class="hh" data-c="2"></i>v5</span><span><i class="hh" data-c="3"></i>gates</span></div><div id="xpList"></div>';
+ const sortOptions=[...panel.querySelector('#xpSort').options];
+ if(publicViewer){
+  panel.querySelector('#xpControls').style.display='none';
+  panel.querySelector('#xpV5m').closest('label').style.display='none';
+  panel.classList.add('xpPublic');
+  st.textContent+='body #xp.xpPublic #xpHead,body #xp.xpPublic #xpList .r{grid-template-columns:var(--xpc0) minmax(0,1fr) var(--xp-public-area,0px);column-gap:0}'+
+   'body #xp.xpPublic #xpHead>span:nth-child(n+4),body #xp.xpPublic #xpList .r>span:nth-child(n+4),'+
+   'body #xp.xpPublic:not(.xpHasArea) #xpHead>span:nth-child(3),body #xp.xpPublic:not(.xpHasArea) #xpList .r>span:nth-child(3){display:none}'+
+   'body #xp.xpPublic.xpHasArea{--xp-public-area:var(--xpc1)}';
+ }
+ function updatePublicControls(rows){
+  const metrics={name:true,area:rows.some(row=>Number.isFinite(row.cm)),iso:rows.some(row=>Number.isFinite(row.iso)),
+   z:rows.some(row=>Number.isFinite(row.z)),ct:rows.some(row=>Number.isFinite(row.ctp))};
+  const sort=$('xpSort'),choices=sortOptions.filter(option=>metrics[option.value]);
+  if(choices.map(option=>option.value).join()!==[...sort.options].map(option=>option.value).join()){
+   sort.replaceChildren(...choices);
+  }
+  if(!choices.some(option=>option.value===F.sort)){F.sort='name';F.desc=false}
+  panel.classList.toggle('xpHasArea',metrics.area);
+  if(F.rollo&&!rows.some(row=>row.rollo===F.rollo))F.rollo=DEF.rollo;
+  for(const key of ['cert','valid','ct','flat','cont','a4','amin','amax','v5min','v5max','isomax','zmin','zmax','ctmin','c17','rep','piece','lab','star','unseen','v5m'])F[key]=DEF[key];
+ }
  const bThumb=document.createElement('button');bThumb.id='xpThumbs';bThumb.className='pre';bThumb.textContent='Thumbnails';
  bThumb.title='Show segment thumbnails (r3f, then R-A congelado, then BASE; fixed contrast, nearest to c+00)';
  const vista=$('vista'),view=document.createElement('select');view.id='xpView';view.setAttribute('aria-label','Explorer view');
@@ -200,8 +223,8 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
    return '<span class="g" title="'+title+'">'+label+' · '+q.profile+'</span>'}
   return '<span class="g" title="'+GATES.map(([k,n,L])=>L+' '+n+': '+(r[k]===true?'pass':r[k]===false?'fail':'unmeasured')).join('\n')+'">'
   +GATES.map(([k,,L])=>{const v=r[k];return v===true?'<b>'+L+'</b>':v===false?'<s>'+L+'</s>':'<u>'+L+'</u>'}).join(' ')+'</span>'}
- function pintar(){save();sync();pintarChips();LABS=new Set(Object.keys(typeof MSK!=='undefined'?MSK:{}).map(k=>k.slice(0,k.lastIndexOf('|'))));ROWS=[...LAM.values()].map(fila);VIS=ordenar(filtrar(ROWS));armarFlat();
-  {const T=GATES.map(([k])=>{let p=0,f=0,u=0;ROWS.forEach(r=>{r[k]===true?p++:r[k]===false?f++:u++});
+ function pintar(){pintarChips();LABS=new Set(Object.keys(typeof MSK!=='undefined'?MSK:{}).map(k=>k.slice(0,k.lastIndexOf('|'))));ROWS=[...LAM.values()].map(fila);if(publicViewer)updatePublicControls(ROWS);save();sync();VIS=ordenar(filtrar(ROWS));armarFlat();
+  if(!publicViewer){const T=GATES.map(([k])=>{let p=0,f=0,u=0;ROWS.forEach(r=>{r[k]===true?p++:r[k]===false?f++:u++});
     return '<tr><th scope="row">'+gateLabels[k]+'</th><td class="p">'+p+'</td><td class="f">'+f+'</td><td class="u">'+u+'</td></tr>'}).join('');
    $('xpTally').innerHTML='<table><caption>All segments · quality gates</caption><thead><tr><th>Gate</th><th>Pass</th><th>Fail</th><th>Unmeasured</th></tr></thead><tbody>'+T+'</tbody></table>'}const nf=['rollo','cert','valid','ct','flat','cont','a4','amin','amax','v5min','v5max','isomax','zmin','zmax','ctmin','rep','piece','lab','star'].filter(k=>F[k]!=='').length+(F.c17?1:0)+(F.unseen?1:0)+(F.q.trim()?1:0);/* 24-sep: segment (row) > map (lamina x model x face, nested) > depth */
   let maps=0,depths=0;

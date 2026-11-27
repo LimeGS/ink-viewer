@@ -40,6 +40,11 @@ async function viewer(options={}){
  if(options.legacy)w.manifest[0].catalogMeta.modelo='base_etiq';
  if(options.models)for(const model of ['r3f','ra_congelado']){const run=JSON.parse(JSON.stringify(w.manifest[0]));run.id='fixture-'+model;run.catalogMeta.modelo=model;w.manifest.push(run)}
  if(options.calibrated){w.VISOR_BOOTSTRAP.rollos.PHerc0175A={scroll:'PHerc0175A',voxel_um:10,paso_hoja_um:[20,40]};w.manifest.forEach(g=>{g.catalogMeta.physicalScaleVerified=true;g.catalogMeta.um_por_px=10})}
+ if(options.publicExplorer){
+  w.VISOR_STATIC={readyEvent:'DOMContentLoaded',mapUrl:frame=>frame+'.png',select:()=>null,resource:path=>path};
+  w.localStorage.setItem('vesuvius.sinVerificar@fixture','0');
+  w.localStorage.setItem('vesuvius.explorer.v1@fixture',JSON.stringify({sort:'v5',cert:'pass',v5min:'0.2',v5m:'r3f',rollo:'missing'}));
+ }
  const context=dom.getInternalVMContext();
  const run=name=>vm.runInContext(read(name),context,{filename:sourcePath(name)});
  try{for(const name of ['deploy_badge.js','origen.js','rollo_visor.js','etiquetar.js','etiq_vc3d.js','viewer.js',
@@ -47,6 +52,26 @@ async function viewer(options={}){
  await new Promise(resolve=>setTimeout(resolve,30));
  return {dom,w,context,errors};
 }
+
+test('the static explorer hides internal controls and ignores saved filters for missing metadata',async()=>{
+ const {dom,w,context,errors}=await viewer({publicExplorer:true,skip:['hist_v5.js']});
+ try{
+  const el=id=>w.document.getElementById(id);
+  const sorts=()=>Array.from(el('xpSort').options,o=>o.value);
+  assert.deepEqual(sorts(),['name']);
+  assert.deepEqual(Array.from(el('xpRollo').options,o=>o.value),['','0175A']);
+  assert.equal(el('xpCount').textContent,'1 segment / 1 ink map / 2 depths');
+  assert.equal(el('xpControls').style.display,'none');
+  assert.equal(el('xpV5m').closest('label').style.display,'none');
+  assert.equal(el('xpTally').textContent,'');
+  assert(!el('xp').classList.contains('xpHasArea'));
+  vm.runInContext("CG={s:{cm2:6,frac_ct:0.95}}",context);
+  w.xpRepintar();
+  assert.deepEqual(sorts(),['area','ct','name']);
+  assert(el('xp').classList.contains('xpHasArea'));
+  assert.deepEqual(errors,[]);
+ }finally{dom.window.close()}
+});
 
 test('whole viewer initializes and supports explorer and depth navigation',async()=>{
  const app=await viewer();
