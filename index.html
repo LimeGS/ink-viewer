@@ -3,7 +3,7 @@
 <link rel="icon" href="images/favicon.ico" sizes="any">
 
 <link rel="preload" href="css/grilli.css" as="style">
-<link rel="preload" href="css/responsive.css?v=373f7a7b03523707" as="style">
+<link rel="preload" href="css/responsive.css?v=194075e548d52c03" as="style">
 <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'self'"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Grilli · Vesuvius ink viewer</title>
 <link rel="stylesheet" href="css/viewer.css"><link rel="stylesheet" href="css/grilli.css"></head><body>
 <header><strong class="grilliBrand"><img src="images/grilli.webp" width="69" height="24" alt="Grilli Security"><span class="viewerName">Vesuvius <span class="muted">/ ink maps</span></span></strong><span id="count"></span></header>
@@ -49,6 +49,6 @@
 <div class="depth"><span>Offset (voxels)</span><button id="prev" aria-label="Previous depth">‹</button><span id="depthWrap"><span id="bandas" aria-hidden="true"></span><input id="depth" type="range" step="1" aria-label="Depth centre"></span><button id="next" aria-label="Next depth">›</button><span class="ofw"><output id="offset"></output><small id="banda"></small></span><button id="bandasBtn" aria-pressed="false" aria-expanded="false" aria-controls="bandasCfg" title="Set the two cut-offs of the sheet-pitch bands">Bands…</button><span class="vsel"><details id="modsWrap" class="mods"><summary id="modsSum" title="Pick one model, or tick up to 4 to compare them side by side">Model</summary><div id="modsList"></div></details><select id="selModelo" aria-label="Model" hidden></select><select id="selCara" aria-label="Face"></select></span></div>
 <div id="bandasCfg" hidden><span id="bPaso"><b>Sheet pitch</b></span><label title="Below this value the centre stays within the same sheet"><span class="sw" style="background:#2f8f63"></span>green &lt; <input type="number" id="bVerde" min="1" max="99999" step="1"> µm <output id="bVerdeCap"></output></label><label title="Above this value the centre may have crossed to the neighbouring sheet"><span class="sw" style="background:#9a7d1e"></span>yellow up to <input type="number" id="bAmar" min="1" max="99999" step="1"> µm <output id="bAmarCap"></output></label><span><span class="sw" style="background:#a3453c"></span>red: above</span><button id="bReset">Reset</button><span id="bEstado"></span></div>
 <footer class="muted"><span id="title"></span><span id="help">Wheel: zoom · drag: pan · F: fit · ← →: depth</span></footer>
-<link rel="stylesheet" href="css/responsive.css?v=373f7a7b03523707">
-<script defer src="pages.js?v=373f7a7b03523707"></script>
+<link rel="stylesheet" href="css/responsive.css?v=194075e548d52c03">
+<script defer src="pages.js?v=194075e548d52c03"></script>
 </body></html>

@@ -1,6 +1,7 @@
 /* Per-scroll physical scale comes from the selected dataset. Missing scale stays unknown. */
 (function(){
- var pedido=new URLSearchParams(location.search).get('rollo');
+ var query=new URLSearchParams(location.search);
+ var pedido=query.get('scroll')||query.get('rollo');
  var porOrigen=window.VISOR_ORIGEN?.scroll||window.ROLLO_SERVIDOR?.scroll;
  var rollo=(pedido&&/^PHerc[0-9A-Za-z]+$/.test(pedido))?pedido:porOrigen||'PHerc1447';
  window.ROLLO=rollo;window.ROLLO_CORTO=rollo.replace(/^PHerc/,'');
@@ -652,12 +653,40 @@ const hasVerifiedMeshAssociation=g=>{
 const catalogTotalSeries=manifest.length;
 /* Configured catalogs without verified bindings open in browsing mode; warnings remain.
    Explicit preferences and deep links still control whether unverified maps are shown. */
-/* 25-sep: &sinverificar=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
+/* 25-sep: &unverified=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
 function mostrarSinVerificar(entries,source,saved,hash){
  const fallback=!!source&&(globalThis.VISOR_STATIC||entries.some(g=>g.catalogMeta))&&!entries.some(hasVerifiedMeshAssociation);
  return hash==='1'||(saved!==null?saved==='1':fallback);
 }
-const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
+function normalizeViewerLink(url) {
+ const legacy={hoja:'sheet',cara:'face',modelo:'model',serie:'series',centro:'depth',etiq:'label',
+  vista:'view',etapas:'gates',paneles:'panes',modelos:'models',sinverificar:'unverified',xprollo:'xpscroll'};
+ function rename(params,aliases) {
+  let changed=false;
+  for(const [oldName,name] of Object.entries(aliases)){
+   if(!params.has(oldName))continue;
+   if(!params.has(name))params.set(name,params.get(oldName));
+   params.delete(oldName);changed=true;
+  }
+  return changed;
+ }
+ const queryChanged=rename(url.searchParams,{rollo:'scroll'});
+ const fragment=new URLSearchParams(url.hash.slice(1));
+ let fragmentChanged=rename(fragment,legacy);
+ const views={mod:'models',zona:'region',pos:'position',malla:'mesh'};
+ const view=fragment.get('view');
+ if(Object.hasOwn(views,view)){fragment.set('view',views[view]);fragmentChanged=true}
+ if(fragment.get('gates')==='apta'){fragment.set('gates','eligible');fragmentChanged=true}
+ if(fragmentChanged)url.hash=fragment.toString();
+ return queryChanged||fragmentChanged;
+}
+function canonicalViewerLink(){
+ const url=new URL(location.href);
+ if(normalizeViewerLink(url))history.replaceState(history.state,'',url.href);
+ return url;
+}
+canonicalViewerLink();
+const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('unverified'));
 manifest.splice(0,manifest.length,...manifest.filter(g=>hasVerifiedMeshAssociation(g)||SIN_VERIFICAR&&Object.keys(g.frames||{}).length));
 const $=id=>document.getElementById(id), vp=$('viewport'), im=$('map'), slider=$('depth'), stage=$('stage');
 let group,zoom=1,x=0,y=0,fitted=true,projection=false,request=0,drag=null,fullresReady=0,fullresGroup=null,fullresDepth=null,maskReady=false;
@@ -783,7 +812,7 @@ function irARollo(rollo){
  UM_POR_PX=VOXEL_UM;PX_POR_CM=UM_POR_PX>0?10000/UM_POR_PX:NaN;
  actualizarDataset();actualizarBandas();
  clave=null;maskReady=false;fullresReady=0;++request;++tokenM;
- const u=new URL(location.href);u.searchParams.set('rollo',rollo);history.replaceState(null,'',u.href);
+ const u=new URL(location.href);u.searchParams.set('scroll',rollo);history.replaceState(null,'',u.href);
  return false;
 }
 function select(i){if(!manifest[i])return;irARollo(visorRolloDe(manifest[i]));group=manifest[i];projection=!!group.catalogMeta?.projectionOnly;let centres=Object.keys(group.frames).map(Number).sort((a,b)=>a-b);slider.min=centres[0];slider.max=centres.at(-1);slider.step=centres.slice(1).reduce((g,v,i)=>{let b=v-centres[i];while(b){[g,b]=[b,g%b]}return g},0)||1;slider.value=centres.includes(0)?0:centres[0];pintarBandas();$('max').disabled=!group.maximum||!!group.catalogMeta?.projectionOnly;$('count').textContent=(Number(i)+1)+' / '+manifest.length+' series · '+(group.catalogMeta?.depthKnown===false?'depth undocumented':centres.length+' offsets')+(hasVerifiedMeshAssociation(group)?'':' · ⚠ mesh not verified');marcarArbol();avisoContam();avisoOrient();if(window.oriBotones)oriBotones();cargandoOn();show(true)}
@@ -822,40 +851,41 @@ new ResizeObserver(()=>{if(fitted)fit()}).observe(vp);document.addEventListener(
  if(e.key.toLowerCase()==='f')fit();if(e.key==='+')scaleTo(zoom*1.35);if(e.key==='-')scaleTo(zoom/1.35)});
 const idParts=id=>id.match(/^(.*?)(_r(?:0|1|2|3|80|90|91|92))?__(fwd|rev)$/);
 var vistaModo='mod';   /* vista del arbol: mod | zona | pos (se usa en syncHash/applyHash) */
+const viewNames={mod:'models',zona:'region',pos:'position',malla:'mesh'};
 function syncHash(){if(!group)return;const m=group.catalogMeta?null:idParts(group.id);
- const q=m?'hoja='+m[1]+'&cara='+m[3]+'&modelo='+(m[2]?m[2].slice(1):'base'):'id='+encodeURIComponent(group.id);
- history.replaceState(null,'','#'+q+'&centro='+(projection?'max':slider.value)+(etiqOn?'&etiq=1':'')+(vistaModo&&vistaModo!=='mod'?'&vista='+vistaModo:'')+(typeof ETAPAS!=='undefined'&&ETAPAS.every(x=>ET[x.k]==='si')?'&etapas=apta':'')+((typeof PANES!=='undefined'&&PANES&&PANES.length&&!PANES.some(q=>q.modelo))?'&paneles='+encodeURIComponent(PANES.map(q=>q.t).join(',')):'')+((typeof MODSEL!=='undefined'&&MODSEL.length>1)?'&modelos='+encodeURIComponent(MODSEL.join(',')):'')+(typeof fxHash==='function'?fxHash():'')+(SIN_VERIFICAR&&!hasVerifiedMeshAssociation(group)?'&sinverificar=1':''))}
-function applyHash(){const p=new URLSearchParams(location.hash.slice(1));if(!p.get('hoja')&&!p.get('id'))return false;
- const mo=p.get('modelo');const id=p.get('id')||p.get('hoja')+(mo&&mo!=='base'?'_'+mo:'')+'__'+(p.get('cara')||'rev');
+ const q=m?'sheet='+m[1]+'&face='+m[3]+'&model='+(m[2]?m[2].slice(1):'base'):'id='+encodeURIComponent(group.id);
+ history.replaceState(null,'','#'+q+'&depth='+(projection?'max':slider.value)+(etiqOn?'&label=1':'')+(vistaModo&&vistaModo!=='mod'?'&view='+viewNames[vistaModo]:'')+(typeof ETAPAS!=='undefined'&&ETAPAS.every(x=>ET[x.k]==='si')?'&gates=eligible':'')+((typeof PANES!=='undefined'&&PANES&&PANES.length&&!PANES.some(q=>q.modelo))?'&panes='+encodeURIComponent(PANES.map(q=>q.t).join(',')):'')+((typeof MODSEL!=='undefined'&&MODSEL.length>1)?'&models='+encodeURIComponent(MODSEL.join(',')):'')+(typeof fxHash==='function'?fxHash():'')+(SIN_VERIFICAR&&!hasVerifiedMeshAssociation(group)?'&unverified=1':''))}
+function applyHash(){const p=new URLSearchParams(canonicalViewerLink().hash.slice(1));if(!p.get('sheet')&&!p.get('id'))return false;
+ const mo=p.get('model');const id=p.get('id')||p.get('sheet')+(mo&&mo!=='base'?'_'+mo:'')+'__'+(p.get('face')||'rev');
  /* serie: desempata cuando dos colecciones comparten el mismo id (substring del label).
     Sin el parametro el comportamiento es identico al de antes. */
- const ser=p.get('serie');
+ const ser=p.get('series');
  let i=ser?manifest.findIndex(g=>g.id===id&&(g.label||'').includes(ser)):-1;
  if(i<0)i=manifest.findIndex(g=>g.id===id);if(i<0)return false;
  select(i);
  if(group!==manifest[i])return true;
- if(p.get('etiq')==='1'&&!etiqOn)modoEtiq(true);
- const vv=p.get('vista');if((vv==='pos'||vv==='zona'||vv==='mod'||vv==='malla')&&vv!==vistaModo)setVista(vv);
- /* &paneles=Inferno,Invertido,...  restaura la comparacion en cuadrantes (hasta 4) */
- const pv=p.get('paneles');
+ if(p.get('label')==='1'&&!etiqOn)modoEtiq(true);
+ const vv=Object.keys(viewNames).find(key=>viewNames[key]===p.get('view'));if(vv&&vv!==vistaModo)setVista(vv);
+ /* &panes=Inferno,Invertido,...  restaura la comparacion en cuadrantes (hasta 4) */
+ const pv=p.get('panes');
  if(pv!=null&&typeof FXPRESETS!=='undefined'){
   const q=decodeURIComponent(pv).split(',').map(t=>t.trim()).filter(Boolean).slice(0,4);
   PANES=q.map(t=>{const d=FXPRESETS.find(z=>z.t.toLowerCase()===t.toLowerCase());
     return d?{t:d.t,fx:Object.assign({},FXDEF,d.fx)}:null}).filter(Boolean);
   if(PANES.length){defsPanes();pintarPanes();fxPintarPresets();fit()}}
  if(typeof fxDesdeHash==='function'){fxDesdeHash(p);if(PANES&&PANES.length)pfxDesdeHash(p)}
- /* &modelos=r3f,r5c,... restaura el mosaico de modelos (hasta 4) de la lamina abierta */
- const mv=p.get('modelos');
+ /* &models=r3f,r5c,... restaura el mosaico de modelos (hasta 4) de la lamina abierta */
+ const mv=p.get('models');
  if(mv!=null){const q=decodeURIComponent(mv).split(',').map(t=>t.trim()).filter(Boolean).slice(0,4);
   setTimeout(()=>{if(!group)return;const e=LAM.get(lamActual());if(!e)return;const t=meta(group);const mods=[...new Set(e.items.map(v=>v.modelo))];
    const ok=q.filter(m=>mods.includes(m));if(ok.length>1){MODSEL=ok;llenarModelos(mods,t.modelo,t.lam);if(typeof pintarModsSum==='function')pintarModsSum();panesDeModelos();if(typeof pfxDesdeHash==='function')pfxDesdeHash(p);syncHash()}},500)}
  /* etapas=apta: deep link al atajo "fit for submission" (las 5 etapas en pasa). Sin el
     parametro no se toca nada y vale lo que haya en localStorage, igual que antes. */
- const ev=p.get('etapas');
- if(false&&ev==='apta'){
+ const ev=p.get('gates');
+ if(false&&ev==='eligible'){
   ETAPAS.forEach(x=>ET[x.k]='si');etGuardar();
   if(typeof etapasAUI==='function')etapasAUI();pintarArbol()}
- const c=p.get('centro');
+ const c=p.get('depth');
  if(c!=null&&c!==''){if(c==='max'){if(group.maximum)projection=true}else if(group.frames[Number(c)]){slider.value=Number(c)}show(true)}
  return true}
 addEventListener('hashchange',applyHash);
@@ -1284,7 +1314,7 @@ const etGuardar=()=>{try{localStorage.setItem(ETKEY,JSON.stringify(ET))}catch(e)
 const etPasa=(r,s)=>s===''?true:s==='si'?r===true:s==='no'?r===false:r===null;
 const etapasOK=()=>true;   /* RETIRADA 15-sep: los desplegables de etapas estan
   ocultos desde que el explorer los reemplazo, pero seguian filtrando el arbol, y
-  un link con &etapas=apta los prendia y los GUARDABA. Un filtro invisible es un
+  un link con &gates=eligible los prendia y los GUARDABA. Un filtro invisible es un
   bug: el unico filtro ahora es el del explorer (window.XPVIS). */
 const etapasOK_vieja=e=>ETAPAS.every(x=>etPasa(x.calc(e),ET[x.k]));
 const ET_GLIFO={true:'✓',false:'✗',null:'?'};
@@ -1974,7 +2004,7 @@ Promise.all(['compuertas.json','compuertas-painting.json','compuertas-work3.json
 addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  if(manifest.length){if(!applyHash()){
   /* multi-rollo: sin hash, abrir una serie del ?rollo= pedido (si la hay); si no, la primera de siempre */
-  const ped=new URLSearchParams(location.search).get('rollo');
+  const ped=new URLSearchParams(location.search).get('scroll');
   const i=ped?manifest.findIndex(g=>(g.scroll||(g.catalogMeta&&g.catalogMeta.scroll))===ped):-1;
   if(i>=0)select(i);else{const pri=CARPETAS.get(ORDEN[0]);pri&&pri.length?irA(pri[0]):select(0)}}}else {
   $('notice').textContent=catalogTotalSeries?'No verified mesh associations are available in this view. Enable Unverified in the explorer to browse the available maps.':'No maps are available in the loaded manifest.';
@@ -2348,7 +2378,8 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  im.addEventListener('load',()=>{HIST.src='';if(FX.auto||PANES.some(p=>p.fx.auto)){fxPedir();if(PANES.length){defsPanes()}}pintarHist()});
  /* el deep link (&paneles=) se aplico antes de que existieran los presets nuevos: re-resolverlo */
  try{const u0=((performance.getEntriesByType('navigation')[0]||{}).name)||location.href;   /* el visor ya reescribio el hash: usar la URL con la que se llego */
-  const pv=new URLSearchParams((u0.split('#')[1]||'')).get('paneles');
+  const hash=new URLSearchParams(u0.split('#')[1]||'');
+  const pv=hash.get('panes')??hash.get('paneles');
   if(pv){const q=decodeURIComponent(pv).split(',').map(t=>t.trim()).filter(Boolean).slice(0,4);
    const AL=(window.PRESET_ALIAS||{});const nuevos=q.map(t=>{t=AL[t]||t;const d=FXPRESETS.find(z=>z.t.toLowerCase()===t.toLowerCase());return d?{t:d.t,fx:Object.assign({},FXDEF,d.fx)}:null}).filter(Boolean);
    if(nuevos.length>PANES.length)PANES=nuevos}}catch(e){}
@@ -2872,7 +2903,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  ctl.forEach(([id,k,t])=>{const e=$(id);e.oninput=()=>{F[k]=t==='bool'?e.checked:e.value;pintar()}});$('xpDir').onclick=()=>{F.desc=!F.desc;pintar()};
  bThumb.onclick=()=>{F.thumbs=!F.thumbs;save();armarFlat();$('xpList').scrollTop=0;pintarVentana();sync()};
  window.xpRepintar=()=>pintar();
- const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
+ const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('unverified');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
  function sync(){ctl.forEach(([id,k,t])=>{const e=$(id);if(t==='bool')e.checked=!!F[k];else if(document.activeElement!==e)e.value=F[k];if(t==='num')e.classList.toggle('on',F[k]!=='')});syncView();$('xpDir').textContent=F.desc?'↓':'↑';$('xpDir').title=F.desc?'Descending — reverse sort':'Ascending — reverse sort';activeFilters();bThumb.classList.toggle('on',!!F.thumbs);bThumb.setAttribute('aria-pressed',String(!!F.thumbs))}
  let ROWS=[],VIS=[],FLAT=[],LABS=new Set();const ABIERTAS=new Set();
  /* 24-sep: a segment row unfolds into its maps (one per lamina x model x face), the segment's own maps first */
@@ -2958,7 +2989,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  /* keep the selection mark in sync when the viewer changes lamina by other means */
  new MutationObserver(()=>{if(F.modo!=='list')return;const act=typeof lamActual==='function'?lamActual():null,gi=manifest.indexOf(group);$('xpList').querySelectorAll('.r').forEach(d=>d.classList.toggle('sel',d.dataset.i!=null?+d.dataset.i===gi:d.dataset.lam===act));}).observe($('count')||document.body,{childList:true,characterData:true,subtree:true});
  /* 27-sep: #xprollo=0800&xpsort=v5&xpv5m=ra_congelado (tambien xpdesc=0|1, xpv5min, xpq) fija el explorador al abrir */
- {const h=new URLSearchParams(location.hash.slice(1)),M={xprollo:'rollo',xpsort:'sort',xpv5m:'v5m',xpv5min:'v5min',xpq:'q'};let hay=false;
+ {const h=new URLSearchParams(location.hash.slice(1)),M={xpscroll:'rollo',xpsort:'sort',xpv5m:'v5m',xpv5min:'v5min',xpq:'q'};let hay=false;
   for(const [k,f] of Object.entries(M))if(h.has(k)){F[f]=h.get(k);hay=true}
   if(h.has('xpdesc')){F.desc=h.get('xpdesc')!=='0';hay=true}
   if(hay){F.modo='list';save()}}
