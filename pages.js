@@ -2,6 +2,7 @@
 (async function () {
   const page = new URL(location.href), source = page.searchParams.get('source') || 'official';
   const header = document.querySelector('header'), picker = document.createElement('form');
+  const assetQuery = document.currentScript ? new URL(document.currentScript.src).search : '';
   const officialRoot = 'https://vesuvius-challenge-open-data.s3.amazonaws.com';
   const official = ['official', 's3://vesuvius-challenge-open-data', officialRoot].includes(source.replace(/\/+$/, ''));
   const labels = source === 'ink-labels';
@@ -183,8 +184,9 @@
     let decode = false;
     if (worker) {
       try {
-        const registration = await worker.register('./raster-worker.js');
-        const controlsPage = () => worker.controller?.scriptURL === new URL('raster-worker.js', page).href;
+        const workerURL = new URL('raster-worker.js' + assetQuery, page).href;
+        const registration = await worker.register(workerURL);
+        const controlsPage = () => worker.controller?.scriptURL === workerURL;
         if (!controlsPage() && registration) await new Promise(resolve => {
           const finish = () => { clearTimeout(timer); worker.removeEventListener('controllerchange', changed); resolve(); };
           const changed = () => { if (controlsPage()) finish(); };
@@ -297,7 +299,7 @@
     window.visorKey = key => key + '@' + root.href;
     window.visorTexto = String; window.visorPuedeGuardar = false; window.HD = true;
     const script = document.createElement('script');
-    script.src = 'viewer-static.js';
+    script.src = 'viewer-static.js' + assetQuery;
     script.onload = () => document.dispatchEvent(new Event(VISOR_STATIC.readyEvent, {bubbles: true}));
     script.onerror = () => say('Could not load the viewer scripts.');
     document.body.append(script);
