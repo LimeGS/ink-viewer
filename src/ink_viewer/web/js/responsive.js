@@ -30,7 +30,7 @@
 })();
 
 /* Reparent label controls after every tool has registered its handlers. */
-addEventListener('DOMContentLoaded',()=>{
+addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  const $=id=>document.getElementById(id),panel=$('panel'),groups=new Map();
  if(!panel||!$('htSec')||!$('gmSec')||!$('impFormato'))return;
  let nodes=[];groups.set('',{nodes});

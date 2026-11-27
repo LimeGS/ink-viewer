@@ -12,7 +12,7 @@
   if(cache.has(r))return cache.get(r);
   var d={scroll:r,voxel_um:null};
   /* The same metadata endpoint serves startup and in-page scroll switches. Never reuse another scroll's scale. */
-  if(/^PHerc[0-9A-Za-z]+$/.test(r)){
+  if(!window.VISOR_STATIC && /^PHerc[0-9A-Za-z]+$/.test(r)){
   try{var x=new XMLHttpRequest();x.open('GET','/api/rollo.js?rollo='+encodeURIComponent(r),false);x.send();
    if(x.status===200){var t=x.responseText.replace(/^\s*window\.ROLLO_SERVIDOR=/,'').replace(/;\s*$/,'');var info=JSON.parse(t);
     if(info&&info.scroll===r)d=info;}}catch(e){}

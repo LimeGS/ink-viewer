@@ -183,7 +183,27 @@ ssh -N -o ExitOnForwardFailure=yes \
 
 Open the same localhost URL on the laptop and keep both the server and tunnel running. Use matching local and remote ports because the application checks the Host header. If `8797` is occupied, choose another port on both sides and start the viewer with that `--port`.
 
-The guide covers [persistent Linux services](docs/guide.md#deploy-on-your-own-server) and optional [managed releases, previews and rollback](docs/guide.md#managed-releases-previews-and-rollback). A static S3 website alone cannot host the application; its Python API is required.
+The guide covers [persistent Linux services](docs/guide.md#deploy-on-your-own-server) and optional [managed releases, previews and rollback](docs/guide.md#managed-releases-previews-and-rollback). For public datasets, the same viewer also runs on GitHub Pages.
+
+### GitHub Pages
+
+Use the source menu in the header to switch datasets. Each selection has a shareable URL.
+
+- **All official maps** opens the Vesuvius Challenge catalog. Published JPEGs are browse-only previews with a link to the original TIFF. **Full resolution** decodes supported TIFFs over HTTPS or localhost (single-page unsigned grayscale or RGB, up to 16 bits, 32 MiB and 16 million pixels, at most 16,384 pixels per side).
+- **All ink-labels** opens VSkinox’s published comparison for every entry, with CT, style A and style C side by side. Choose a label style (A–D) to inspect its native pixels with a class palette and open the original PNG. Individual CT depth layers are available in the Python viewer. [Dataset and attribution](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels)
+- **Custom HTTP / S3** accepts an image URL, a JSON viewer manifest, an indexed dataset root or a public `s3://bucket/prefix/`. A prefix in the official bucket filters the catalog when matching maps exist. Other unindexed S3 prefixes need public `ListBucket` access to discover images. An indexed source only needs readable objects. Remote hosts must allow cross-origin GET requests from the Pages origin; use HTTPS URLs on the public site.
+
+Native-resolution maps support local labeling and PNG export. GPU inference, CT cross-sections, server crops and shared annotation saves require the Python service.
+
+To publish, select **Settings → Pages → Build and deployment → GitHub Actions**, then run **Static viewer on GitHub Pages** from the Actions tab. Each build refreshes both catalog indexes. To try the same build locally:
+
+```sh
+npm ci
+python3 scripts/build_pages.py build/ink-viewer
+python3 -m http.server 8000 --directory build
+```
+
+Open `http://localhost:8000/ink-viewer/`. For an offline build, pass a saved official `metadata.json` or `metadata.json.gz` with `--metadata` and the ink-labels `entries.csv` with `--ink-labels-csv`. The browser reads the images directly from their data hosts.
 
 </details>
 

@@ -34,7 +34,7 @@ import ink_viewer.catalog.master_inventory as master
 import ink_viewer.server.canonical_masks as canonical
 import ink_viewer.server.corte as corte
 import ink_viewer.server.inksdk_job as inksdk
-from ink_viewer.paths import WEB_ROOT, web_asset
+from ink_viewer.paths import VIEWER_TOOLS, WEB_ROOT, web_asset
 from ink_viewer.server.fuentes import Fuente, guardar_json, ruta_dentro
 from ink_viewer.server.hf_sync import HFSync
 from ink_viewer.server.tiff_header import tiff_dims, tiff_region
@@ -55,26 +55,8 @@ CODE = WEB_ROOT
 STATIC = {
     str(path.relative_to(CODE))
     for path in CODE.rglob("*")
-    if path.is_file() and path.suffix in {".js", ".css", ".html", ".woff2", ".webp"}
+    if path.is_file() and path.suffix in {".js", ".css", ".html", ".woff2", ".webp", ".ico"}
 }
-VIEWER_TOOLS = (
-    "filtros_pro.js",
-    "super_mosaico.js",
-    "precarga.js",
-    "fallo_visible.js",
-    "explorer_pro.js",
-    "ui_modos.js",
-    "hist_v5.js",
-    "spinner.js",
-    "etiq_extra.js",
-    "hd.js",
-    "etiq_herramientas.js",
-    "guias_medicion.js",
-    "responsive.js",
-    "inksdk.js",
-    "corte.js",
-    "recorte.js",
-)
 LOG_FILE = None  # set by main() next to the --config file
 
 

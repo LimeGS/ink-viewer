@@ -6,9 +6,9 @@
    available behind the "Tree" button. Reads the viewer's own data (LAM, CG, LEG, MSK) - nothing duplicated. */
 (function(){
  if(typeof LAM==='undefined'||typeof irA!=='function'){console.warn('explorer_pro: viewer globals missing');return}
- let OBJ=null,EXCL={},PROPS=new Set();fetch('/api/propuestas',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{PROPS=new Set(l);pintar()}).catch(()=>{});
-let MASC=new Set();fetch('mascaras.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{MASC=new Set(l);pintar()}).catch(()=>{});
-fetch('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d){OBJ=d.objetivo;EXCL=d.excluir||{};pintar()}}).catch(()=>{});
+ let OBJ=null,EXCL={},PROPS=new Set();if (!window.VISOR_STATIC) fetch('/api/propuestas',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{PROPS=new Set(l);pintar()}).catch(()=>{});
+let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{MASC=new Set(l);pintar()}).catch(()=>{});
+(globalThis.visorFetchData || fetch)('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d){OBJ=d.objetivo;EXCL=d.excluir||{};pintar()}}).catch(()=>{});
  const CKEY='vesuvius.explorer.cols.v1';
  /* 16-sep: star, name(flexible), cm2, v5, gates. Defaults fit one line at the panel's own width. */
  const CDEF=[14,46,40,88];let COLS=CDEF.slice();
@@ -156,6 +156,7 @@ fetch('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{i
  /* Warm cache: every depth of every listed lamina through the proxy (server-side .s3cache). Progress is
     counted in DEPTHS (one depth = its full PNGs + previews), shown in a bar under the controls. */
  let WARM=null;
+ if (window.VISOR_STATIC) $('xpWarm').disabled=true;
  $('xpWarm').onclick=async()=>{const b=$('xpWarm');if(WARM){WARM.stop=true;return}
   const deps=new Map();VIS.forEach(r=>r.e.items.forEach(it=>{const fr=manifest[it.i].frames||{};Object.entries(fr).forEach(([c,d])=>{const base=d.replace(/^\.\.\//,'');if(!deps.has(base))deps.set(base,{lam:r.lam,c,files:[['fixed'],['global'],['fixed',4],['fixed',8],['global',4],['global',8]].map(([c,k])=>mapUrl(d,c,k).replace(/^\.\.\//,''))})})}));
   const D=[...deps.values()],lams=new Set(D.map(d=>d.lam));if(!D.length)return;
@@ -169,7 +170,7 @@ fetch('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{i
  ctl.forEach(([id,k,t])=>{const e=$(id);e.oninput=()=>{F[k]=t==='bool'?e.checked:e.value;pintar()}});$('xpDir').onclick=()=>{F.desc=!F.desc;pintar()};
  bThumb.onclick=()=>{F.thumbs=!F.thumbs;save();armarFlat();$('xpList').scrollTop=0;pintarVentana();sync()};
  window.xpRepintar=()=>pintar();
- const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem('vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
+ const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
  function sync(){ctl.forEach(([id,k,t])=>{const e=$(id);if(t==='bool')e.checked=!!F[k];else if(document.activeElement!==e)e.value=F[k];if(t==='num')e.classList.toggle('on',F[k]!=='')});syncView();$('xpDir').textContent=F.desc?'↓':'↑';$('xpDir').title=F.desc?'Descending — reverse sort':'Ascending — reverse sort';activeFilters();bThumb.classList.toggle('on',!!F.thumbs);bThumb.setAttribute('aria-pressed',String(!!F.thumbs))}
  let ROWS=[],VIS=[],FLAT=[],LABS=new Set();const ABIERTAS=new Set();
  /* 24-sep: a segment row unfolds into its maps (one per lamina x model x face), the segment's own maps first */
@@ -180,7 +181,10 @@ fetch('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{i
  function thumbDe(r,model){const its=r.e.items||[],it=model?its.find(x=>model.test(x.modelo||'')):its.find(x=>/^r3f(?![-_ ]?evo)/i.test(x.modelo||''))||its.find(x=>/ra_congelado/i.test(x.modelo||''))||its.find(x=>/base/i.test(x.modelo||''))||its[0];
   if(!it||typeof mapUrl!=='function')return null;const fr=(manifest[it.i]||{}).frames||{};
   const k=fr['0']!=null?'0':Object.keys(fr).sort((a,b)=>Math.abs(a)-Math.abs(b))[0];
-  return k==null?null:{u:mapUrl(fr[k],'fixed',8),zoom:mapUrl(fr[k],'fixed',4),m:it.modelo,c:k}}
+  if(k==null)return null;
+  const frame=fr[k], contrasts=manifest[it.i]?.frameContrasts?.[frame]||[], contrast=contrasts.includes('fixed')?'fixed':contrasts[0]||'fixed';
+  const fallback=globalThis.VISOR_STATIC&&!/\.tiff?$/i.test(frame)?mapUrl(frame,contrast):null;
+  return {u:mapUrl(frame,contrast,8),zoom:mapUrl(frame,contrast,4),fallback,m:it.modelo,c:k}}
  function armarFlat(){paintedWindow=null;visibleRows.clear();FLAT=[];VIS.forEach(r=>{FLAT.push(r);if(ABIERTAS.has(r.lam))[...r.e.items].sort((a,b)=>(a.hoja!==r.lam)-(b.hoja!==r.lam)||a.hoja.localeCompare(b.hoja)).forEach(it=>FLAT.push({sub:true,r,it}))});armarOff()}
  function plegar(r){if(ABIERTAS.has(r.lam))ABIERTAS.delete(r.lam);else ABIERTAS.add(r.lam);armarFlat();pintarVentana()}
  function meshLocation(g){const p=g?.meshAssociation?.meshPath;if(!p)return 'Mesh path unavailable';const cfg=window.VISOR_ORIGEN;if(!cfg?.origen||!p.startsWith('../catalog/'))return p;
@@ -228,9 +232,10 @@ fetch('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{i
     '<span class="num">'+(r.cm!=null?r.cm.toFixed(2):'—')+'</span><span class="num" title="v5 legibility'+(r.v5c!=null?' @c'+r.v5c:'')+(r.v5m?' · '+r.v5m:'')+(r.v5p!=null?' · p'+r.v5p.toFixed(1)+' within scroll and model':'')+'">'+(r.v5==null?'—':F.v5m==='pct'?'p'+r.v5p.toFixed(1):r.v5.toFixed(3))+'</span>'+marca(r);
    d.title=meshTooltip(r.e.items);d.querySelector('.n').title+='\n'+d.title;
    if(F.thumbs){const first=thumbDe(r),base=thumbDe(r,/base/i),thumbs=[first,...(base&&base.u!==first?.u?[base]:[])].filter(Boolean),box=document.createElement('div');box.className='thumbs';d.append(box);thumbs.forEach(t=>{if(t.u){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=modCorto(t.m)+' · c'+(+t.c>=0?'+':'')+t.c;figure.append(caption);box.append(figure);const im=document.createElement('img');im.className='th';im.alt=modCorto(t.m)+' preview';im.decoding='async';im.tabIndex=0;
-    im.title=modCorto(t.m)+' \u00b7 c'+(+t.c>=0?'+':'')+t.c+' \u00b7 preview';im.loading='lazy';im.fetchPriority='low';im.src=t.u;
-    im.onerror=()=>{im.style.visibility='hidden'};
-    im.onmouseenter=im.onfocus=()=>{let z=$('xpZoom');if(!z){z=document.createElement('img');z.id='xpZoom';z.alt='';
+    im.title=modCorto(t.m)+' \u00b7 c'+(+t.c>=0?'+':'')+t.c+' \u00b7 preview';im.crossOrigin='anonymous';im.loading='lazy';im.fetchPriority='low';im.src=t.u;
+    im.onerror=()=>{if(t.fallback&&im.src!==t.fallback){im.src=t.fallback;t.zoom=t.fallback}
+      else im.style.visibility='hidden'};
+    im.onmouseenter=im.onfocus=()=>{let z=$('xpZoom');if(!z){z=document.createElement('img');z.crossOrigin='anonymous';z.id='xpZoom';z.alt='';
      z.style.cssText='position:fixed;z-index:9999;max-width:min(62vw,900px);max-height:86vh;border:1px solid #2d8a6d;background:#05080c;box-shadow:0 8px 30px #000a;pointer-events:none';
      z.onerror=()=>{z.hidden=true};document.body.append(z)}const b=im.getBoundingClientRect();z.src=t.zoom;
      z.style.left=Math.max(8,Math.min(b.right+12,innerWidth-Math.min(innerWidth*.62,900)-8))+'px';

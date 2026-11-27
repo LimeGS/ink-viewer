@@ -10,6 +10,7 @@
 
 let canonicalMaskModePromise;
 function canonicalMaskMode() {
+  if (window.VISOR_STATIC) return Promise.resolve(false);
   return canonicalMaskModePromise ||= fetch('/api/origen').then(r=>{if(!r.ok)throw new Error('Cannot verify canonical mask source');return r.json()}).then(j=>!!j.canonical_masks);
 }
 const $q = s => document.querySelector(s);
@@ -106,6 +107,7 @@ async function confirmarMetadatosMascara(blobs,info,label) {
   return true;
 }
 async function obtenerParMascara(lam,c,base,propuesta = false,rollo = window.ROLLO,soloMetadata = false) {
+  if (window.VISOR_STATIC) return null;
   const q = new URLSearchParams({c:String(c),rollo:String(rollo || '')});
   if (base) q.set('base',base); if (propuesta) q.set('propuesta','1');
   const crop = globalThis.recorteVista && globalThis.recorteVista.info(); if (crop) q.set('recorte',[crop.x,crop.y,crop.ancho,crop.alto].join(','));

@@ -58,6 +58,7 @@
    el.textContent=`${H.nombre}  ${H.w}x${H.h}\nink     ~${t.toLocaleString()} px${cm2(t)}\nno ink   ~${n.toLocaleString()} px${cm2(n)}\nunlabelled ~${(H.w*H.h-t-n).toLocaleString()} px`},600)}}
  window.mascaraVacia=function(){if(!mctx||!mask.width)return true;const w=64,h=64;cntC=lienzo(cntC,w,h);const g=cntC.getContext('2d',{willReadFrequently:true});g.clearRect(0,0,w,h);g.drawImage(mask,0,0,w,h);const d=g.getImageData(0,0,w,h).data;for(let i=3;i<d.length;i+=4)if(d[i]>0)return false;return true};
 /* ===== import a PROPOSED mask (tutorial 5: predictions -> conservative labels -> human edit) for the current depth ===== */
+ if (window.VISOR_STATIC) return;
  const bi=document.createElement('button');bi.id='impProp';bi.textContent='import proposal';bi.title='Load the automatic proposal for this lamina and depth from the selected source: ink where strokes are repeatable, no-ink on clean background. Then edit with the brush and save.';
  bi.onclick=async()=>{const destino=destinoMascara();if(!destino||!mascaraLista()){msg('Wait for the full-resolution image and mask');return}
   const lam=destino.grupo?(typeof meta==='function'?meta(destino.grupo).lam:destino.grupo.id):null;const seg=(typeof segId==='function')?segId(lam):lam;const cen=(destino.nombre.match(/\|c(.+)$/)||[])[1];

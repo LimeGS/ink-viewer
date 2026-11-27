@@ -613,7 +613,7 @@ if(typeof select==='function'){const select0=select;
     if(window.subirParS3){s3Pend=false;window.subirParS3(du.centro).then(()=>msg("Annotations saved: "+lam+' '+c)).catch(e=>msg('Annotation save failed for '+lam+' '+c+': '+String(e).slice(0,100)))}}}
   catch(e){}
   return select0.apply(this,arguments)}}
-addEventListener('beforeunload',e=>{if(H&&PEND[clavePend(H.nombre)]){e.preventDefault();e.returnValue="There are unsaved annotation changes"}});
+addEventListener('beforeunload',e=>{if(window.VISOR_STATIC?pendiente:H&&PEND[clavePend(H.nombre)]){e.preventDefault();e.returnValue="There are unsaved annotation changes"}});
 if(typeof modoEtiq==='function'){const modoEtiq0=modoEtiq;
  modoEtiq=function(v){const r=modoEtiq0.apply(this,arguments);
   if(v){agendarMeta();pintarCorrida();dibujarZona(ZONA)}else{fijarHerr('');cancelarPrev();cerrarConf();dibujarZona(null)}return r}}
@@ -722,6 +722,7 @@ soltarFoco($h('htInt'));$h('htInt').onchange=e=>alternarInteligente(e.target.che
 soltarFoco($h('htSobre'));$h('htSobre').onchange=e=>{CFG.sobre=e.target.checked;recalcular()};
 $h('htAplicar').onclick=aplicarPrev;$h('htCancelar').onclick=()=>cancelarPrev("preview cancelada");
 $h('htConfSi').onclick=()=>{const f=CONF;cerrarConf();if(f)f()};$h('htConfNo').onclick=()=>{cerrarConf();estado("Cancelled")};
+$h('htCargar').disabled=!!window.VISOR_STATIC;
 $h('htCargar').onclick=cargarGuardada;
 {const pa=document.getElementById('panes');if(pa)new MutationObserver(()=>{pintarLimite();if(CFG.inteligente&&!limiteListo()&&!PREP)prepararLimite().catch(()=>{})}).observe(pa,{childList:true})}   /* 8. paneles nuevos o cerrados: otro límite */
 {const moMo=new MutationObserver(()=>{if(HERR==='varita'){const c=claseDelPincel();estado("Wand; brush class: "+(c?NOMBRE[c]:"choose 1 ink, 2 non-ink or 3 erase"),!c)}});

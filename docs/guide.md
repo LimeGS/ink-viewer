@@ -262,7 +262,7 @@ sudo journalctl -u ink-viewer -n 50
 
 The SSH tunnel remains the access method. On macOS, the foreground quick start works directly; a persistent service can be managed by your own process supervisor.
 
-See [Security](#security) before sharing access. A static S3 website alone cannot host the complete application: the Python API is required for source access and validated server saves.
+See [Security](#security) before sharing access. GitHub Pages and other static hosts can serve the browser viewer for public HTTP datasets. See the [static build and deployment instructions](../README.md#github-pages). Use the Python service for private sources, server-side processing and shared annotation saves.
 
 ## Managed releases, previews and rollback
 

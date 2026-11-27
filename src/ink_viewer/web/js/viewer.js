@@ -10,6 +10,7 @@ function previewOf(url,scale){
 }
 function mapUrl(frame,contrast,scale){
  if(!frame)return null;
+ if(globalThis.VISOR_STATIC)return VISOR_STATIC.mapUrl(frame,contrast,scale);
  if(!OFFICIAL_FRAME.test(frame))return frame+'/'+contrast+(scale===4?'_lo.jpg':scale===8?'_lo8.jpg':'.png');
  const ext=/\.(png|tiff?)$/i.exec(frame);
  const url=ext?frame.slice(0,-ext[0].length)+(contrast==='global'?'-global':'')+ext[0]:frame+(contrast==='global'?'-global':'')+'.png';
@@ -29,10 +30,10 @@ const catalogTotalSeries=manifest.length;
    Explicit preferences and deep links still control whether unverified maps are shown. */
 /* 25-sep: &sinverificar=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
 function mostrarSinVerificar(entries,source,saved,hash){
- const fallback=!!source&&entries.some(g=>g.catalogMeta)&&!entries.some(hasVerifiedMeshAssociation);
+ const fallback=!!source&&(globalThis.VISOR_STATIC||entries.some(g=>g.catalogMeta))&&!entries.some(hasVerifiedMeshAssociation);
  return hash==='1'||(saved!==null?saved==='1':fallback);
 }
-const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem('vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
+const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
 manifest.splice(0,manifest.length,...manifest.filter(g=>hasVerifiedMeshAssociation(g)||SIN_VERIFICAR&&Object.keys(g.frames||{}).length));
 const $=id=>document.getElementById(id), vp=$('viewport'), im=$('map'), slider=$('depth'), stage=$('stage');
 let group,zoom=1,x=0,y=0,fitted=true,projection=false,request=0,drag=null,fullresReady=0,fullresGroup=null,fullresDepth=null,maskReady=false;
@@ -76,7 +77,7 @@ function pintarRegla(){
  if(!cx||!cy||!im.naturalWidth){return}
  const dpr=devicePixelRatio||1, W=vp.clientWidth, H=vp.clientHeight-26;
  for(const [cv,w,h] of [[cx,W,26],[cy,46,H]]){if(cv.width!==Math.round(w*dpr))cv.width=Math.round(w*dpr);if(cv.height!==Math.round(h*dpr))cv.height=Math.round(h*dpr);const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);}
- if(!(UM_POR_PX>0)||group?.catalogMeta?.physicalScaleVerified===false)return;
+ if(globalThis.VISOR_STATIC?.reduced||!(UM_POR_PX>0)||group?.catalogMeta?.physicalScaleVerified===false)return;
  const pxcm=PX_POR_CM*zoom, paso=pasoLindo(pxcm), pasoPx=paso*pxcm;
  if(!isFinite(pasoPx)||pasoPx<=0)return;
  const gx=cx.getContext('2d'); gx.strokeStyle='#64ddd1'; gx.fillStyle='#9bacbe'; gx.font='10px ui-monospace,monospace'; gx.lineWidth=1;
@@ -134,17 +135,20 @@ function scaleTo(z,cx=vp.clientWidth/2,cy=vp.clientHeight/2){z=Math.max(.005,Mat
 function ensureContrast(){for(const o of $('contrast').options){o.dataset.originalLabel ||= o.textContent;o.textContent=group?.catalogMeta?.originalContrast&&o.value==='fixed'?'Original image':o.dataset.originalLabel}if(!group?.frameContrasts)return;const dir=projection?group.maximum:group.frames[Number(slider.value)],modes=group.frameContrasts[dir]||group.availableContrasts||[];for(const o of $('contrast').options)o.disabled=!modes.includes(o.value);if(modes.length&&!modes.includes($('contrast').value))$('contrast').value=modes[0]}
 function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThis.recorteVista.showing();if(pintar)release();if(!group.catalogMeta)for(const o of $('contrast').options)o.disabled=false;ensureContrast();let n=Number(slider.value),dir=projection?group.maximum:group.frames[n];$('offset').value=projection?'Max.':group.catalogMeta?.depthKnown===false?'Map':signed(n);pintarBanda(n);syncHash();if(projection){const o=group.maximumOffsets||[];$('projection').textContent='Maximum '+(o.length?signed(Math.min(...o))+'…'+signed(Math.max(...o)):'across depths')+' · can merge strokes from different sheets or artefacts.'}$('prev').disabled=projection||n<=Number(slider.min);$('next').disabled=projection||n>=Number(slider.max);slider.disabled=projection||group.catalogMeta?.depthKnown===false;$('projection').hidden=!projection;$('max').classList.toggle('active',projection);$('max').setAttribute('aria-pressed',String(projection));let token=++request;fullresReady=0;$('notice').hidden=false;im.style.opacity='.3';
  if(!dir){$('notice').textContent='This centre is not available yet';im.hidden=true;$('download').removeAttribute('href');return}
- const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();
- loader.onload=()=>{if(token!==request)return;if(globalThis.recorteVista)globalThis.recorteVista.reduced(null);let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px'+(globalThis.recorteVista?globalThis.recorteVista.title():'');if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
+ const staticMap=globalThis.VISOR_STATIC?.select(dir,$('contrast').value);
+ const url=mapUrl(dir,$('contrast').value);$('notice').textContent='Loading image…';const loader=new Image();loader.crossOrigin='anonymous';loader.fetchPriority='high';
+ loader.onload=()=>{if(token!==request)return;if(globalThis.recorteVista)globalThis.recorteVista.reduced(null);let changed=im.naturalWidth!==loader.naturalWidth||im.naturalHeight!==loader.naturalHeight;im.onload=()=>{if(token!==request)return;fullresReady=token;fullresGroup=group;fullresDepth=projection?'max':String(n);if(reset||changed||fitted)fit();else paint();fxPedir(true)};im.src=url;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('notice').hidden=true;$('download').href=staticMap?.original||url;im.alt=group.id+' · '+(projection?'maximum across depths':'centre '+signed(n));$('title').textContent=group.id+' · '+loader.naturalWidth+' × '+loader.naturalHeight+' px'+(globalThis.recorteVista?globalThis.recorteVista.title():'');if(reset||changed||fitted){const[lw,lh]=oriDims(oriEf(group),loader.naturalWidth,loader.naturalHeight);zoom=Math.min(vp.clientWidth/lw,vp.clientHeight/lh)*.96;x=(vp.clientWidth-lw*zoom)/2;y=(vp.clientHeight-lh*zoom)/2;fitted=true;paint()}trasFrame(loader.naturalWidth,loader.naturalHeight)};
  /* 24-nov: a TIFF map too large for full resolution in a browser (official whole segments reach gigapixels) opens as a
     reduced, browse-only view: the 1/4 map, or the published 1/8 JPEG. fullresReady stays 0, so labeling stays locked. */
  const reduced=()=>{if(token!==request)return;const W=loader.naturalWidth,H=loader.naturalHeight,changed=im.naturalWidth!==W||im.naturalHeight!==H;
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
-  im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=loader.src;
-  $('notice').hidden=false;$('notice').textContent='Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
+  im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=staticMap?.original||loader.src;
+  $('notice').hidden=false;$('notice').textContent=staticMap?(staticMap.caption||'Published preview · browse only. Open the original TIFF for its native grid.'):'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
   if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
+ if(staticMap?.preview){loader.reduced=true;loader.onload=reduced}
  loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);
-  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;loader.src=mapUrl(dir,$('contrast').value,4);return}
+  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true);loader.src=mapUrl(dir,$('contrast').value,4);return}
+  if(staticMap){cargandoOff();im.hidden=true;$('download').href=staticMap.original;$('notice').textContent='Cannot display this map. Check browser access (CORS), or open the original file.';return}
   cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
 }
 /* multi-rollo (29-sep): all selection paths switch context without unloading the viewer. */
@@ -260,7 +264,7 @@ let etiqOn=false,renderBg=false,espacio=false,pintar=false,movido=0;
    nombre: si el prefijo no coincide con la carpeta, no las encuentra.
    `alias.json` traduce nuestros nombres viejos (hoja3_c1_c2, fr_c00...) al segment_id. */
 var ALIAS={};
-fetch('alias.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d){ALIAS=d;pintarArbol();if(window.xpRepintar)window.xpRepintar()}}).catch(()=>{});
+(globalThis.visorFetchData || fetch)('alias.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d){ALIAS=d;pintarArbol();if(window.xpRepintar)window.xpRepintar()}}).catch(()=>{});
 const segId=lam=>ALIAS[lam]||lam;
 const nombreEtiquetas=(lam,tipo)=>segId(lam)+'_'+(tipo||'inklabels')+'.png';
 const MSKKEY=visorKey('vesuvius.mascaras.v1');
@@ -271,7 +275,7 @@ const mskClave=()=>{if(!group)return null;const t=meta(group);
 let mskTimer=null;
 function mskGuardarPronto(){clearTimeout(mskTimer);mskTimer=setTimeout(mskGuardar,800)}
 function mskGuardar(){
- const k=mskClave(); if(!k||!mask||!mask.width)return;
+ const k=mskClave(); if(globalThis.VISOR_STATIC?.reduced||!k||!mask||!mask.width)return;
  try{
   /* PERF 12-sep: no PNG here (the pixels are in IndexedDB per depth); only a stamp so the tree/explorer know the lamina is labelled */
   if(window.mascaraVacia&&mascaraVacia()){if(MSK[k]){delete MSK[k];mskPersistir();pintarArbol()}return}
@@ -327,7 +331,7 @@ let aliasKit=[];const rolloKitInicial=ROLLO;
 function cargarKit(){const rollo=ROLLO,kit=KIT;
  aliasKit.forEach(k=>delete alias[k]);aliasKit=[];HOJAS=[];
  if(!DATASET.scroll&&rollo!==rolloKitInicial)return;
- fetch(kit+'hojas.json').then(r=>r.ok?r.json():null).then(hs=>{if(rollo!==ROLLO||kit!==KIT||!Array.isArray(hs))return;HOJAS=hs;
+ (globalThis.visorFetchData || fetch)(kit+'hojas.json').then(r=>r.ok?r.json():null).then(hs=>{if(rollo!==ROLLO||kit!==KIT||!Array.isArray(hs))return;HOJAS=hs;
   hs.forEach(h=>{alias[h.nombre]=h;aliasKit.push(h.nombre);Object.values(h.frames||{}).forEach(f=>{const m=/([^/]+)__(fwd|rev)_$/.exec(f.dir);if(m){alias[m[1]]=h;aliasKit.push(m[1])}})});
   clave=null;if(!vp.classList.contains('cargando'))trasFrame()}).catch(()=>{});
 }
@@ -353,6 +357,7 @@ function trasFrame(w,h){cargandoOff();
  if(!group)return;
  curW=w||curW||im.naturalWidth;curH=h||curH||im.naturalHeight;
  if(!curW)return;
+ if(globalThis.VISOR_STATIC?.reduced){maskReady=false;montarCapas(null);return}
  /* one mask per DEPTH (12-sep): the sheet key carries the centre, so changing depth swaps the working mask (IndexedDB) */
  const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);   /* 25-sep: clave de la grilla (ver claveLienzo) */
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}
@@ -360,7 +365,7 @@ function trasFrame(w,h){cargandoOff();
  dibujarRegion();
 }
 /* 25-sep: si el censo de orientación llega después de montar la máscara, la clave pasa de la vieja (por corrida) a la de la grilla */
-function reclavar(){if(!group||!curW||vp.classList.contains('cargando'))return;
+function reclavar(){if(globalThis.VISOR_STATIC?.reduced||!group||!curW||vp.classList.contains('cargando'))return;
  const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}}
 
@@ -390,7 +395,7 @@ function montarCapas(hoja){
  $('render').disabled=!(hoja&&hoja.capas&&hoja.capas.length);renderBg=false;$('render').classList.remove('active');
  if($('render').disabled)return;
  hoja.capas.forEach(c=>{
-  const img=new Image();img.onload=()=>fxPedir(true);img.src=KIT+c.f;img.style.opacity=c.op;img.hidden=true;   // arrancan apagadas: el visor por defecto muestra tinta
+  const img=new Image();img.crossOrigin='anonymous';img.onload=()=>fxPedir(true);img.src=globalThis.VISOR_STATIC?VISOR_STATIC.resource(KIT+c.f):KIT+c.f;img.style.opacity=c.op;img.hidden=true;   // arrancan apagadas: el visor por defecto muestra tinta
   stage.insertBefore(img,im);capasImg.push(img);
   const row=document.createElement('div');row.className='capaRow';
   row.innerHTML='<input type=checkbox><span></span><input type=range min=0 max=1 step=.05>';
@@ -406,13 +411,13 @@ function dibujarRegion(){let r=$('regbox');
  r.setAttribute('x',Math.min(regIni[0],regFin[0]));r.setAttribute('y',Math.min(regIni[1],regFin[1]));
  r.setAttribute('width',Math.abs(regFin[0]-regIni[0]));r.setAttribute('height',Math.abs(regFin[1]-regIni[1]))}
 
-function modoEtiq(v){etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
+function modoEtiq(v){if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
  if(window.requireAnnotationHD)window.requireAnnotationHD(v);
  $('etiq').classList.toggle('active',v);$('etiq').setAttribute('aria-pressed',String(v));
  $('mask').style.display=v?'block':'none';espejarMascara();syncHash()}
 $('etiq').onclick=()=>modoEtiq(!etiqOn);
 $('mkOp').oninput=e=>{$('mask').style.opacity=e.target.value;espejarMascara()};
-window.addEventListener('beforeunload',e=>{if(s3Pend){e.preventDefault();e.returnValue='Strokes not yet saved to S3'}});
+window.addEventListener('beforeunload',e=>{if(s3Pend && !globalThis.VISOR_STATIC){e.preventDefault();e.returnValue='Strokes not yet saved to S3'}});
 $('chkMapa').onchange=e=>{im.style.opacity=e.target.checked?$('mapOp').value:0};
 $('mapOp').oninput=e=>{if($('chkMapa').checked)im.style.opacity=e.target.value};
 $('render').onclick=()=>{renderBg=!renderBg;$('render').classList.toggle('active',renderBg);
@@ -974,7 +979,7 @@ function srcDeModelo(m){
 }
 //
 
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  fxDestinoAUI();
 });
 function panesDeModelos(){
@@ -1087,7 +1092,7 @@ function pintarPanes(){acomodarReparto();
  const cajas = cajasPanes(W,H,n);   /* 25-sep: con el separador arrastrable */
  if(cont.children.length!==n){cont.innerHTML='';
   PANES.forEach((p,i)=>{const d=document.createElement('div'); d.className='pane q'+i;
-   const g=document.createElement('img'); g.draggable=false;
+   const g=document.createElement('img'); g.crossOrigin='anonymous';g.draggable=false;
    g.onload=()=>paint();   /* 25-sep: la matriz de orientacion usa el tamano real de la imagen del panel */
    const om=document.createElement('span'); om.className='om'; om.hidden=true;
    const pm=document.createElement('canvas'); pm.className='pm';
@@ -1164,13 +1169,13 @@ window.oriMarcar=function(){let m=$('oriMarca');if(!m){m=document.createElement(
  const t=PANES&&PANES.length?'':oriTexto(group);m.hidden=!t;if(m.textContent!==t)m.textContent=t};   /* en paneles cada uno lleva su marca */
 document.addEventListener('keydown',e=>{if(!group||e.ctrlKey||e.metaKey||e.altKey||['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName))return;
  if(e.key==='o'||e.key==='O'){oriAlternar();e.preventDefault()}});
-addEventListener('DOMContentLoaded',()=>{const lab=$('etiq');if(!lab)return;   /* junto a Label / Open PNG (ui_modos ya armo los grupos) */
+addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{const lab=$('etiq');if(!lab)return;   /* junto a Label / Open PNG (ui_modos ya armo los grupos) */
  const mk=(id,txt,tit,fn)=>{const b=document.createElement('button');b.id=id;b.type='button';b.textContent=txt;b.title=tit;b.onclick=fn;lab.parentElement.insertBefore(b,lab);return b};
  mk('oriAuto','','',oriAlternar).hidden=true;
  mk('voltF',"flip ↕","Flip displayed rows vertically. Display only; PNG and mask grids remain unchanged. Remembered across runs.",()=>voltear('f'));
  mk('voltC',"flip ↔","Flip displayed columns horizontally. Display only; PNG and mask grids remain unchanged. Remembered across runs.",()=>voltear('c'));
  oriBotones()});
-fetch('orientacion_vista.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.corridas){oriCambiar(()=>{ORI=d.corridas});reclavar()}}).catch(()=>{});   /* 25-sep: reclavar = lienzo de la grilla */
+(globalThis.visorFetchData || fetch)('orientacion_vista.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.corridas){oriCambiar(()=>{ORI=d.corridas});reclavar()}}).catch(()=>{});   /* 25-sep: reclavar = lienzo de la grilla */
 function fxPintarPresets(){const c=$('fxPresets');if(!c)return;c.innerHTML='';
  FXPRESETS.forEach(p=>{const b=document.createElement('button');b.textContent=p.t;b.title=p.d;
   if(fxPresetActivo(p))b.classList.add('on');
@@ -1327,11 +1332,11 @@ var LEG={};
    campana_fl22/catalogo/v5_visor.py en work-3, copiado a all-gallery/). LEG_V5M = las entradas con por_modelo (auto + fl22)
    para el selector «v5 de» del explorador; sin el archivo el visor queda como antes. */
 var LEG_V5M={};
-Promise.all(['legibilidad.json','../catalog/_viewer/legibilidad-auto.json','legibilidad-fl22.json','../catalog/'+ROLLO+'/_viewer/legibilidad-auto.json'].map(url=>fetch(url,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([base,auto,fl22,sample])=>{
+Promise.all(['legibilidad.json','../catalog/_viewer/legibilidad-auto.json','legibilidad-fl22.json','../catalog/'+ROLLO+'/_viewer/legibilidad-auto.json'].map(url=>(globalThis.visorFetchData || fetch)(url,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([base,auto,fl22,sample])=>{
  LEG_V5M={...(auto&&auto.laminas||{}),...(fl22&&fl22.laminas||{}),...(sample&&sample.laminas||{})};
  const d=base||auto||fl22||sample?{laminas:{...(auto&&auto.laminas||{}),...(fl22&&fl22.laminas||{}),...(base&&base.laminas||{}),...(sample&&sample.laminas||{})}}:null;
  if(d&&d.laminas){LEG=d.laminas;const seg={};LAM.forEach(e=>{const b=[e.lam,...e.hojas].map(h=>LEG[h]).filter(l=>l&&Number.isFinite(l.max)).sort((a,b)=>b.max-a.max)[0];if(b)seg[e.lam]=b});Object.assign(LEG,seg);CARPETAS.forEach(v=>v.sort(compareV5Lamina));ARB=armar(vistaModo);pintarArbol();if(window.xpRepintar)window.xpRepintar();if(window.v5HistRepintar)window.v5HistRepintar();}}).catch(()=>{});
-Promise.all(['compuertas.json','compuertas-painting.json','compuertas-work3.json','../catalog/_viewer/compuertas-auto.json','../catalog/'+ROLLO+'/_viewer/compuertas-auto.json'].map(url=>fetch(url,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([legacy,painting,work3,auto,sample])=>{
+Promise.all(['compuertas.json','compuertas-painting.json','compuertas-work3.json','../catalog/_viewer/compuertas-auto.json','../catalog/'+ROLLO+'/_viewer/compuertas-auto.json'].map(url=>(globalThis.visorFetchData || fetch)(url,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([legacy,painting,work3,auto,sample])=>{
  const d={laminas:{...(auto&&auto.laminas||{}),...(legacy&&legacy.laminas||{}),...(painting&&painting.laminas||{}),...(work3&&work3.laminas||{}),...(sample&&sample.laminas||{})},umbrales:legacy&&legacy.umbrales};
  if(!d||!d.laminas)return;CG=d.laminas;if(d.umbrales)CGum=d.umbrales;
  {const seg={};LAM.forEach(e=>{const h=e.hojas.filter(h=>h!==e.lam&&CG[h]).sort((a,b)=>(CG[b].cm2??-1)-(CG[a].cm2??-1))[0];if(h)seg[e.lam]={...CG[h],...(CG[e.lam]||{})}});Object.assign(CG,seg)}
@@ -1342,7 +1347,7 @@ Promise.all(['compuertas.json','compuertas-painting.json','compuertas-work3.json
   if(window.xpRepintar)try{window.xpRepintar()}catch(e){}
  const b=$('tree').querySelector('.lam.sel');if(b)b.scrollIntoView({block:'nearest'})}).catch(()=>{});
 
-addEventListener('DOMContentLoaded',()=>{
+addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  if(manifest.length){if(!applyHash()){
   /* multi-rollo: sin hash, abrir una serie del ?rollo= pedido (si la hay); si no, la primera de siempre */
   const ped=new URLSearchParams(location.search).get('rollo');
