@@ -5,7 +5,7 @@
    "Whole map" goes back to the reduced view. viewer.js, corte.js, etiquetar.js and etiq_herramientas.js read the
    window through window.recorteVista. */
 (function(){
- const SIZE=8192,$id=id=>document.getElementById(id);
+ const staticViewer=window.VISOR_STATIC, SIZE=staticViewer?2048:8192,$id=id=>document.getElementById(id);
  const state={crop:null,reduced:null,picking:false,down:null};
  const lam=()=>typeof group!=='undefined'&&group&&(group.catalogMeta&&group.catalogMeta.lam||group.id)||null;
  const say=t=>{if(typeof msg==='function')msg(t)};
@@ -18,16 +18,41 @@
  function windowAt(p,full,reduced){const w=Math.min(SIZE,full.w),h=Math.min(SIZE,full.h),
    at=(v,size,total)=>Math.max(0,Math.min(total-size,Math.round((v-size/2)/(SIZE/2))*(SIZE/2)));
   return {x:at(p[0]*full.w/reduced.w,w,full.w),y:at(p[1]*full.h/reduced.h,h,full.h),ancho:w,alto:h,ancho_mapa:full.w,alto_mapa:full.h}}
- async function pick(p){const r=state.reduced;state.picking=false;paintButton();if(!r)return;
-  const response=await fetch('/api/dims/'+r.url.split('?')[0].replace(/^\/api\/mapa\//,''));
-  const full=response.ok?await response.json():null;
-  if(!full||!(full.w>0&&full.h>0)){say('Crop unavailable: the map size could not be read');return}
-  state.crop={...windowAt(p,full,r),lam:lam()};say('Loading a full-resolution crop…');redraw()}
+ function choose(){
+  state.picking=!state.picking;paintButton();
+  if(staticViewer)document.getElementById('notice').textContent=state.picking
+   ?'Click the map to label a full-resolution crop.':'Published preview · select Label to edit a crop.';
+ }
+ async function pick(p){
+  const r=state.reduced;state.picking=false;paintButton();if(!r)return;
+  const owner=group;
+  if(staticViewer&&(p[0]<0||p[0]>=r.w||p[1]<0||p[1]>=r.h)){choose();return}
+  try{
+   let full;
+   if(staticViewer)full=await staticViewer.cropDimensions(r.original);
+   else{
+    const response=await fetch('/api/dims/'+r.url.split('?')[0].replace(/^\/api\/mapa\//,''));
+    full=response.ok?await response.json():null;
+   }
+   if(state.reduced!==r||group!==owner||state.picking||state.crop)return;
+   if(!full||!(full.w>0&&full.h>0))throw new Error('the map size could not be read');
+   if(staticViewer&&Math.abs(r.w/r.h-full.w/full.h)/(full.w/full.h)>.03)
+    throw new Error('the preview does not match the original grid');
+   state.crop={...windowAt(p,full,r),lam:lam(),...(staticViewer?{original:r.original}:{})};
+   say('Loading a full-resolution crop…');redraw();
+   if(staticViewer)modoEtiq(true);
+  }catch(error){
+   if(state.reduced!==r||group!==owner)return;
+   const message='Crop unavailable: '+error.message;
+   say(message);
+   if(staticViewer)document.getElementById('notice').textContent=message;
+  }
+ }
  function init(){
   const button=document.createElement('button');button.id='recorteBtn';button.hidden=true;
   button.title='Label a full-resolution window of a map too large to label whole';
   const anchor=$id('download');if(anchor)anchor.parentNode.insertBefore(button,anchor);else document.querySelector('.toolbar').appendChild(button);
-  button.addEventListener('click',()=>{if(state.crop){state.crop=null;redraw();return}state.picking=!state.picking;paintButton()});
+  button.addEventListener('click',()=>{if(state.crop){state.crop=null;redraw();return}choose()});
   const vp=$id('viewport');
   /* document capture runs before viewer.js's own capture listener on #viewport, which stops the event while labeling waits
      for full resolution; while picking, the press is ours alone (no "view-only" note, no pan) and the click still follows */
@@ -35,11 +60,12 @@
    vp.addEventListener('click',e=>{if(!state.picking||!state.down||Math.abs(e.clientX-state.down[0])+Math.abs(e.clientY-state.down[1])>4)return;
     if(typeof rp==='function')pick(rp(e))})}
   paintButton();return true}
- window.recorteVista={state,windowAt,pick,init,
+ window.recorteVista={state,windowAt,pick,choose,init,
   /* viewer.js: start of show(); another segment drops the crop */
   showing(){if(state.crop&&state.crop.lam!==lam())state.crop=null},
   /* viewer.js: the reduced view is on screen ({url,w,h}) or a full-resolution image is (null) */
-  reduced(r){state.reduced=r||null;if(r)state.picking=state.picking&&!state.crop;paintButton()},
+  reduced(r){state.reduced=r||null;if(!r)state.picking=false;else state.picking=state.picking&&!state.crop;paintButton();
+   if(staticViewer&&r&&state.picking)document.getElementById('notice').textContent='Click the map to label a full-resolution crop.'},
   /* viewer.js: a crop that fails to load falls back to the reduced view */
   failed(){if(!state.crop)return false;state.crop=null;say('The crop could not be loaded; back to the reduced view');return true},
   /* only maps of the cropped segment (other models in compare panes too), never those of other segments */

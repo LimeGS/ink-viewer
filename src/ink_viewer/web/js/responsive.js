@@ -58,7 +58,8 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  const fileBody=files.lastElementChild;
  const format=document.createElement('label');format.className='labelFormat';format.append('PNG format',$('impFormato'));
  const imports=document.createElement('div');imports.className='fila';imports.append($('imp'),$('htCargar'));
- const exports=document.createElement('div');exports.className='fila';exports.append($('verPng'),$('guardarTodasMascaras'));
+ const exports=document.createElement('div');exports.className='fila';exports.append($('verPng'));
+ if(!window.VISOR_STATIC)exports.append($('guardarTodasMascaras'));
  fileBody.prepend(format,imports,$('impProp'),exports);
  const jsonActions=document.createElement('div');jsonActions.className='fila';jsonActions.append($('copJson'),$('pegJson'));
  const json=section('labelJson','Mask JSON',[jsonActions,$('ta')]);fileBody.append(json);
@@ -70,8 +71,8 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  for(const {heading,nodes} of groups.values())sections.append(...[heading].filter(Boolean),...nodes);
  const warnings=document.createElement('div');warnings.id='labelWarnings';warnings.setAttribute('role','status');warnings.hidden=true;
  const footer=document.createElement('div');footer.id='labelFooter';
- const actions=document.createElement('div');actions.className='fila';actions.append($('guardarMascaraServidor'),$('exp'));
- const storage=document.createElement('small');storage.textContent=visorPuedeGuardar?'Inklabels + supervision PNGs':'Read-only annotation storage';
+ const actions=document.createElement('div');actions.className='fila';if(!window.VISOR_STATIC)actions.append($('guardarMascaraServidor'));actions.append($('exp'));
+ const storage=document.createElement('small');storage.hidden=!!window.VISOR_STATIC;storage.textContent=visorPuedeGuardar?'Inklabels + supervision PNGs':'Read-only annotation storage';
  const status=document.createElement('div');status.id='labelStatus';status.setAttribute('role','status');
  ['msg','htCorridaEst','htEstado','gmEstado'].forEach(id=>{const e=$(id);if(e)status.append(e)});
  footer.append(actions,storage,status);panel.replaceChildren(header,$('htPend'),warnings,brush,sections,footer);panel.classList.add('labelCompact');

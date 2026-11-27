@@ -28,12 +28,40 @@ const hasVerifiedMeshAssociation=g=>{
 const catalogTotalSeries=manifest.length;
 /* Configured catalogs without verified bindings open in browsing mode; warnings remain.
    Explicit preferences and deep links still control whether unverified maps are shown. */
-/* 25-sep: &sinverificar=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
+/* 25-sep: &unverified=1 en el link las lista solo en esa carga (sin tocar la preferencia guardada) */
 function mostrarSinVerificar(entries,source,saved,hash){
  const fallback=!!source&&(globalThis.VISOR_STATIC||entries.some(g=>g.catalogMeta))&&!entries.some(hasVerifiedMeshAssociation);
- return hash==='1'||(saved!==null?saved==='1':fallback);
+ return !!globalThis.VISOR_STATIC||hash==='1'||(saved!==null?saved==='1':fallback);
 }
-const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('sinverificar'));
+function normalizeViewerLink(url) {
+ const legacy={hoja:'sheet',cara:'face',modelo:'model',serie:'series',centro:'depth',etiq:'label',
+  vista:'view',etapas:'gates',paneles:'panes',modelos:'models',sinverificar:'unverified',xprollo:'xpscroll'};
+ function rename(params,aliases) {
+  let changed=false;
+  for(const [oldName,name] of Object.entries(aliases)){
+   if(!params.has(oldName))continue;
+   if(!params.has(name))params.set(name,params.get(oldName));
+   params.delete(oldName);changed=true;
+  }
+  return changed;
+ }
+ const queryChanged=rename(url.searchParams,{rollo:'scroll'});
+ const fragment=new URLSearchParams(url.hash.slice(1));
+ let fragmentChanged=rename(fragment,legacy);
+ const views={mod:'models',zona:'region',pos:'position',malla:'mesh'};
+ const view=fragment.get('view');
+ if(Object.hasOwn(views,view)){fragment.set('view',views[view]);fragmentChanged=true}
+ if(fragment.get('gates')==='apta'){fragment.set('gates','eligible');fragmentChanged=true}
+ if(fragmentChanged)url.hash=fragment.toString();
+ return queryChanged||fragmentChanged;
+}
+function canonicalViewerLink(){
+ const url=new URL(location.href);
+ if(normalizeViewerLink(url))history.replaceState(history.state,'',url.href);
+ return url;
+}
+canonicalViewerLink();
+const SIN_VERIFICAR=mostrarSinVerificar(manifest,window.VISOR_ORIGEN,localStorage.getItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar'),new URLSearchParams(location.hash.slice(1)).get('unverified'));
 manifest.splice(0,manifest.length,...manifest.filter(g=>hasVerifiedMeshAssociation(g)||SIN_VERIFICAR&&Object.keys(g.frames||{}).length));
 const $=id=>document.getElementById(id), vp=$('viewport'), im=$('map'), slider=$('depth'), stage=$('stage');
 let group,zoom=1,x=0,y=0,fitted=true,projection=false,request=0,drag=null,fullresReady=0,fullresGroup=null,fullresDepth=null,maskReady=false;
@@ -144,10 +172,10 @@ function show(reset=false){if(!group)return;if(globalThis.recorteVista)globalThi
   im.onload=()=>{if(token!==request)return;if(reset||changed||fitted)fit();else paint();fxPedir(true)};
   im.src=loader.src;im.hidden=false;im.style.opacity=$('chkMapa').checked?$('mapOp').value:0;$('download').href=staticMap?.original||loader.src;
   $('notice').hidden=false;$('notice').textContent=staticMap?(staticMap.caption||'Published preview · browse only. Open the original TIFF for its native grid.'):'Reduced view: this map is too large for full resolution in a browser. To label it, use Label a crop.';
-  if(globalThis.recorteVista)globalThis.recorteVista.reduced({url,w:W,h:H});im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
+  if(globalThis.recorteVista)globalThis.recorteVista.reduced(!staticMap||VISOR_STATIC.cropTarget?{url,w:W,h:H,original:staticMap?.original}:null);im.alt=group.id+' · reduced view';$('title').textContent=group.id+' · reduced view '+W+' × '+H+' px · browse only';trasFrame(W,H)};
  if(staticMap?.preview){loader.reduced=true;loader.onload=reduced}
  loader.onerror=()=>{if(token!==request)return;if(globalThis.recorteVista&&globalThis.recorteVista.failed())return show(true);
-  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true);loader.src=mapUrl(dir,$('contrast').value,4);return}
+  if(/\.tiff?$/i.test(dir||'')&&!loader.reduced&&(!staticMap||staticMap.fallback)){loader.reduced=true;$('notice').textContent='Too large for full resolution: loading a reduced view…';loader.onload=reduced;if(staticMap)VISOR_STATIC.setReduced(true,!!VISOR_STATIC.cropTarget);loader.src=mapUrl(dir,$('contrast').value,4);return}
   if(staticMap){cargandoOff();im.hidden=true;$('download').href=staticMap.original;$('notice').textContent='Cannot display this map. Check browser access (CORS), or open the original file.';return}
   cargandoOff();im.hidden=true;$('notice').textContent='Could not load the image. Change the centre or try again.';$('download').removeAttribute('href')};loader.src=url;
 }
@@ -159,7 +187,7 @@ function irARollo(rollo){
  UM_POR_PX=VOXEL_UM;PX_POR_CM=UM_POR_PX>0?10000/UM_POR_PX:NaN;
  actualizarDataset();actualizarBandas();
  clave=null;maskReady=false;fullresReady=0;++request;++tokenM;
- const u=new URL(location.href);u.searchParams.set('rollo',rollo);history.replaceState(null,'',u.href);
+ const u=new URL(location.href);u.searchParams.set('scroll',rollo);history.replaceState(null,'',u.href);
  return false;
 }
 function select(i){if(!manifest[i])return;irARollo(visorRolloDe(manifest[i]));group=manifest[i];projection=!!group.catalogMeta?.projectionOnly;let centres=Object.keys(group.frames).map(Number).sort((a,b)=>a-b);slider.min=centres[0];slider.max=centres.at(-1);slider.step=centres.slice(1).reduce((g,v,i)=>{let b=v-centres[i];while(b){[g,b]=[b,g%b]}return g},0)||1;slider.value=centres.includes(0)?0:centres[0];pintarBandas();$('max').disabled=!group.maximum||!!group.catalogMeta?.projectionOnly;$('count').textContent=(Number(i)+1)+' / '+manifest.length+' series · '+(group.catalogMeta?.depthKnown===false?'depth undocumented':centres.length+' offsets')+(hasVerifiedMeshAssociation(group)?'':' · ⚠ mesh not verified');marcarArbol();avisoContam();avisoOrient();if(window.oriBotones)oriBotones();cargandoOn();show(true)}
@@ -198,40 +226,41 @@ new ResizeObserver(()=>{if(fitted)fit()}).observe(vp);document.addEventListener(
  if(e.key.toLowerCase()==='f')fit();if(e.key==='+')scaleTo(zoom*1.35);if(e.key==='-')scaleTo(zoom/1.35)});
 const idParts=id=>id.match(/^(.*?)(_r(?:0|1|2|3|80|90|91|92))?__(fwd|rev)$/);
 var vistaModo='mod';   /* vista del arbol: mod | zona | pos (se usa en syncHash/applyHash) */
+const viewNames={mod:'models',zona:'region',pos:'position',malla:'mesh'};
 function syncHash(){if(!group)return;const m=group.catalogMeta?null:idParts(group.id);
- const q=m?'hoja='+m[1]+'&cara='+m[3]+'&modelo='+(m[2]?m[2].slice(1):'base'):'id='+encodeURIComponent(group.id);
- history.replaceState(null,'','#'+q+'&centro='+(projection?'max':slider.value)+(etiqOn?'&etiq=1':'')+(vistaModo&&vistaModo!=='mod'?'&vista='+vistaModo:'')+(typeof ETAPAS!=='undefined'&&ETAPAS.every(x=>ET[x.k]==='si')?'&etapas=apta':'')+((typeof PANES!=='undefined'&&PANES&&PANES.length&&!PANES.some(q=>q.modelo))?'&paneles='+encodeURIComponent(PANES.map(q=>q.t).join(',')):'')+((typeof MODSEL!=='undefined'&&MODSEL.length>1)?'&modelos='+encodeURIComponent(MODSEL.join(',')):'')+(typeof fxHash==='function'?fxHash():'')+(SIN_VERIFICAR&&!hasVerifiedMeshAssociation(group)?'&sinverificar=1':''))}
-function applyHash(){const p=new URLSearchParams(location.hash.slice(1));if(!p.get('hoja')&&!p.get('id'))return false;
- const mo=p.get('modelo');const id=p.get('id')||p.get('hoja')+(mo&&mo!=='base'?'_'+mo:'')+'__'+(p.get('cara')||'rev');
+ const q=m?'sheet='+m[1]+'&face='+m[3]+'&model='+(m[2]?m[2].slice(1):'base'):'id='+encodeURIComponent(group.id);
+ history.replaceState(null,'','#'+q+'&depth='+(projection?'max':slider.value)+(etiqOn?'&label=1':'')+(vistaModo&&vistaModo!=='mod'?'&view='+viewNames[vistaModo]:'')+(typeof ETAPAS!=='undefined'&&ETAPAS.every(x=>ET[x.k]==='si')?'&gates=eligible':'')+((typeof PANES!=='undefined'&&PANES&&PANES.length&&!PANES.some(q=>q.modelo))?'&panes='+encodeURIComponent(PANES.map(q=>q.t).join(',')):'')+((typeof MODSEL!=='undefined'&&MODSEL.length>1)?'&models='+encodeURIComponent(MODSEL.join(',')):'')+(typeof fxHash==='function'?fxHash():'')+(SIN_VERIFICAR&&!hasVerifiedMeshAssociation(group)?'&unverified=1':''))}
+function applyHash(){const p=new URLSearchParams(canonicalViewerLink().hash.slice(1));if(!p.get('sheet')&&!p.get('id'))return false;
+ const mo=p.get('model');const id=p.get('id')||p.get('sheet')+(mo&&mo!=='base'?'_'+mo:'')+'__'+(p.get('face')||'rev');
  /* serie: desempata cuando dos colecciones comparten el mismo id (substring del label).
     Sin el parametro el comportamiento es identico al de antes. */
- const ser=p.get('serie');
+ const ser=p.get('series');
  let i=ser?manifest.findIndex(g=>g.id===id&&(g.label||'').includes(ser)):-1;
  if(i<0)i=manifest.findIndex(g=>g.id===id);if(i<0)return false;
  select(i);
  if(group!==manifest[i])return true;
- if(p.get('etiq')==='1'&&!etiqOn)modoEtiq(true);
- const vv=p.get('vista');if((vv==='pos'||vv==='zona'||vv==='mod'||vv==='malla')&&vv!==vistaModo)setVista(vv);
- /* &paneles=Inferno,Invertido,...  restaura la comparacion en cuadrantes (hasta 4) */
- const pv=p.get('paneles');
+ if(p.get('label')==='1'&&!etiqOn)modoEtiq(true);
+ const vv=Object.keys(viewNames).find(key=>viewNames[key]===p.get('view'));if(vv&&vv!==vistaModo)setVista(vv);
+ /* &panes=Inferno,Invertido,...  restaura la comparacion en cuadrantes (hasta 4) */
+ const pv=p.get('panes');
  if(pv!=null&&typeof FXPRESETS!=='undefined'){
   const q=decodeURIComponent(pv).split(',').map(t=>t.trim()).filter(Boolean).slice(0,4);
   PANES=q.map(t=>{const d=FXPRESETS.find(z=>z.t.toLowerCase()===t.toLowerCase());
     return d?{t:d.t,fx:Object.assign({},FXDEF,d.fx)}:null}).filter(Boolean);
   if(PANES.length){defsPanes();pintarPanes();fxPintarPresets();fit()}}
  if(typeof fxDesdeHash==='function'){fxDesdeHash(p);if(PANES&&PANES.length)pfxDesdeHash(p)}
- /* &modelos=r3f,r5c,... restaura el mosaico de modelos (hasta 4) de la lamina abierta */
- const mv=p.get('modelos');
+ /* &models=r3f,r5c,... restaura el mosaico de modelos (hasta 4) de la lamina abierta */
+ const mv=p.get('models');
  if(mv!=null){const q=decodeURIComponent(mv).split(',').map(t=>t.trim()).filter(Boolean).slice(0,4);
   setTimeout(()=>{if(!group)return;const e=LAM.get(lamActual());if(!e)return;const t=meta(group);const mods=[...new Set(e.items.map(v=>v.modelo))];
    const ok=q.filter(m=>mods.includes(m));if(ok.length>1){MODSEL=ok;llenarModelos(mods,t.modelo,t.lam);if(typeof pintarModsSum==='function')pintarModsSum();panesDeModelos();if(typeof pfxDesdeHash==='function')pfxDesdeHash(p);syncHash()}},500)}
  /* etapas=apta: deep link al atajo "fit for submission" (las 5 etapas en pasa). Sin el
     parametro no se toca nada y vale lo que haya en localStorage, igual que antes. */
- const ev=p.get('etapas');
- if(false&&ev==='apta'){
+ const ev=p.get('gates');
+ if(false&&ev==='eligible'){
   ETAPAS.forEach(x=>ET[x.k]='si');etGuardar();
   if(typeof etapasAUI==='function')etapasAUI();pintarArbol()}
- const c=p.get('centro');
+ const c=p.get('depth');
  if(c!=null&&c!==''){if(c==='max'){if(group.maximum)projection=true}else if(group.frames[Number(c)]){slider.value=Number(c)}show(true)}
  return true}
 addEventListener('hashchange',applyHash);
@@ -357,7 +386,7 @@ function trasFrame(w,h){cargandoOff();
  if(!group)return;
  curW=w||curW||im.naturalWidth;curH=h||curH||im.naturalHeight;
  if(!curW)return;
- if(globalThis.VISOR_STATIC?.reduced){maskReady=false;montarCapas(null);return}
+ if(globalThis.VISOR_STATIC?.reduced){montarCapas(null);return}
  /* one mask per DEPTH (12-sep): the sheet key carries the centre, so changing depth swaps the working mask (IndexedDB) */
  const hoja=hojaDe(group.id),k=claveLienzo(group,curW,curH)+(globalThis.recorteVista?globalThis.recorteVista.key():'')+'|c'+(projection?'max':slider.value);   /* 25-sep: clave de la grilla (ver claveLienzo) */
  if(k!==clave){clave=k;montarCapas(hoja);montarMascara(hoja,k,curW,curH)}
@@ -411,7 +440,7 @@ function dibujarRegion(){let r=$('regbox');
  r.setAttribute('x',Math.min(regIni[0],regFin[0]));r.setAttribute('y',Math.min(regIni[1],regFin[1]));
  r.setAttribute('width',Math.abs(regFin[0]-regIni[0]));r.setAttribute('height',Math.abs(regFin[1]-regIni[1]))}
 
-function modoEtiq(v){if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
+function modoEtiq(v){if(v)globalThis.VISOR_STATIC?.prepareLabel?.();if(v&&globalThis.VISOR_STATIC?.reduced)return;etiqOn=v;$('panel').hidden=!v;document.body.classList.toggle('etiq',v);
  if(window.requireAnnotationHD)window.requireAnnotationHD(v);
  $('etiq').classList.toggle('active',v);$('etiq').setAttribute('aria-pressed',String(v));
  $('mask').style.display=v?'block':'none';espejarMascara();syncHash()}
@@ -497,9 +526,15 @@ const segRuta=g=>{for(const f of Object.values(g.frames||{})){const m=/catalog\/
 const SEG_ROLLOS=new Map();manifest.forEach(g=>{const s=segRuta(g);if(s){if(!SEG_ROLLOS.has(s.seg))SEG_ROLLOS.set(s.seg,new Set());SEG_ROLLOS.get(s.seg).add(s.scroll)}});
 const segmentKey=s=>SEG_ROLLOS.get(s.seg)?.size>1?s.scroll+'/'+s.seg:s.seg;
 const filaDe=g=>{const s=segRuta(g);return s?segmentKey(s):meta(g).lam};
+function segmentDisplayName(entry){
+ const {lam:name,scroll}=entry;
+ if(scroll==='PHercCustom'||!/^PHerc[0-9A-Za-z]+$/.test(scroll||''))return name;
+ if(name===scroll||['/','-','_',' '].some(separator=>name.startsWith(scroll+separator)))return name;
+ return scroll+' · '+name;
+}
 const LAM=new Map(),FILA_DE_HOJA={};
 manifest.forEach((g,i)=>{const t=meta(g),s=segRuta(g),k=s?segmentKey(s):t.lam;let e=LAM.get(k);
- if(!e)LAM.set(k,e={lam:k,cm:t.cm,z:t.z,est:t.est,fam:t.fam,catalog:true,scroll:s?.scroll||g.catalogMeta?.scroll||null,items:[],hojas:[]});
+ if(!e)LAM.set(k,e={lam:k,cm:t.cm,z:t.z,est:t.est,fam:t.fam,catalog:true,scroll:s?.scroll||g.scroll||g.catalogMeta?.scroll||null,items:[],hojas:[]});
  if(e.cm==null)e.cm=t.cm;if(!e.z)e.z=t.z;if(!e.est)e.est=t.est;e.catalog=e.catalog&&!!g.catalogMeta;
  if(!e.hojas.includes(t.lam))e.hojas.push(t.lam);FILA_DE_HOJA[t.lam]=k;
  e.items.push({i,modelo:t.modelo,cara:t.cara,hoja:t.lam})});
@@ -660,7 +695,7 @@ const etGuardar=()=>{try{localStorage.setItem(ETKEY,JSON.stringify(ET))}catch(e)
 const etPasa=(r,s)=>s===''?true:s==='si'?r===true:s==='no'?r===false:r===null;
 const etapasOK=()=>true;   /* RETIRADA 15-sep: los desplegables de etapas estan
   ocultos desde que el explorer los reemplazo, pero seguian filtrando el arbol, y
-  un link con &etapas=apta los prendia y los GUARDABA. Un filtro invisible es un
+  un link con &gates=eligible los prendia y los GUARDABA. Un filtro invisible es un
   bug: el unico filtro ahora es el del explorer (window.XPVIS). */
 const etapasOK_vieja=e=>ETAPAS.every(x=>etPasa(x.calc(e),ET[x.k]));
 const ET_GLIFO={true:'✓',false:'✗',null:'?'};
@@ -668,17 +703,17 @@ const etapasTxt=e=>ETAPAS.map(x=>x.g+ET_GLIFO[x.calc(e)]).join(' ');
 const etapasTitulo=e=>ETAPAS.map(x=>x.t+': '+({true:'pass',false:'fail',null:'unmeasured'})[x.calc(e)]).join('\n')+'\n\n'+cgTitulo(e);
 function pintarArbol(){if($('tree').hidden||$('tree').style.display==='none')return;const q=$('buscar').value.trim().toLowerCase(),t=$('tree'),act=lamActual(),actMod=group?meta(group).modelo:null;t.innerHTML='';
  const passSet=new Set();
- NODOS.forEach(n=>{if((!q||n.e.lam.toLowerCase().includes(q))&&etapasOK(n.e)&&(!window.XPVIS||window.XPVIS.has(n.e.lam)))passSet.add(n.e.lam)});
+ NODOS.forEach(n=>{if((!q||segmentDisplayName(n.e).toLowerCase().includes(q))&&etapasOK(n.e)&&(!window.XPVIS||window.XPVIS.has(n.e.lam)))passSet.add(n.e.lam)});
  const evEl=$('etapasVisible');if(evEl)evEl.textContent=passSet.size+' of '+LAM.size+' laminae visible with this filter';
  const hay=n=>n.e.lam===act&&n.mod===actMod;let prim=true;
  ARB.forEach((sub,nom1)=>{
-  const pasa=n=>(!q||n.e.lam.toLowerCase().includes(q))&&(n.msk?true:etapasOK(n.e))&&(!window.XPVIS||window.XPVIS.has(n.e.lam));
+  const pasa=n=>(!q||segmentDisplayName(n.e).toLowerCase().includes(q))&&(n.msk?true:etapasOK(n.e))&&(!window.XPVIS||window.XPVIS.has(n.e.lam));
   const vis=[...sub].map(([b,ns])=>[b,ns.filter(pasa)]).filter(p=>p[1].length);
   if(!vis.length)return;
   const distintas=ns=>new Set(ns.map(n=>(n.e&&n.e.lam)||n.lam||n)).size;
   const tot=distintas(vis.flatMap(p=>p[1]));
   const d=document.createElement('details');d.open=!!q||prim||vis.some(p=>p[1].some(hay));prim=false;
-  const su=document.createElement('summary');su.textContent=nom1+' ('+tot+')';d.append(su);
+  const su=document.createElement('summary');su.textContent=(vistaModo==='malla'&&LAM.has(nom1)?segmentDisplayName(LAM.get(nom1)):nom1)+' ('+tot+')';d.append(su);
   vis.forEach(([nom2,ns])=>{let d2;
    if(nom2===''){d2=d}  /* vista por modelo: sin segundo nivel */
    else{d2=document.createElement('details');d2.open=!!q||ns.some(hay);
@@ -699,15 +734,18 @@ function pintarArbol(){if($('tree').hidden||$('tree').style.display==='none')ret
       setTimeout(()=>mskCargar(n.msk),400)};
      d2.append(b); return}
     const e=n.e,ct=(e.hojas||[e.lam]).some(h=>esContam(h,n.mod)),b=document.createElement('button');b.className='lam'+(hay(n)?' sel':'')+(ct?' contam':'');
-    b.textContent=(vistaModo==='malla'?(MODCORTO[n.mod]||n.mod)+' · '+(n.cara||''):e.lam);
+    b.textContent=(vistaModo==='malla'?(MODCORTO[n.mod]||n.mod)+' · '+(n.cara||''):segmentDisplayName(e));
+    if(vistaModo==='malla')b.title=segmentDisplayName(e);
     if(ct){b.title=CONTAM_TIT;const g=document.createElement('i');g.className='tag';g.textContent='TRAINING';b.append(g)}
     const s=document.createElement('small');
     const lg=LEG[e.lam], lgTxt=lg?('v5 '+lg.max.toFixed(3)+' @c'+lg.mejor_centro):'';
-    s.textContent=vistaModo==='pos'
+    s.textContent=window.VISOR_STATIC
+      ?[e.cm!=null?e.cm.toFixed(2)+' cm²':'',e.z].filter(Boolean).join(' · ')
+      :vistaModo==='pos'
       ?[e.cm!=null?e.cm.toFixed(2)+' cm²':'',lineaPos(e),lgTxt,etapasTxt(e)].filter(Boolean).join(' · ')
       :[e.cm!=null?e.cm.toFixed(2)+' cm²':'',e.est,cgTxt(e),e.z,lgTxt,etapasTxt(e)].filter(Boolean).join(' · ');
     if(lg)s.title=(s.title?s.title+'\n\n':'')+'Legibility index v5-R2B (EXPERIMENTAL): maximum '+lg.max.toFixed(3)+' over 512-px windows at centre '+lg.mejor_centro+'.\nIt is an UNCALIBRATED RANKING: it orders laminae, it does not claim there are letters.';
-    if(!ct)s.title=etapasTitulo(e);
+    if(!ct&&!window.VISOR_STATIC)s.title=etapasTitulo(e);
     if(vistaModo==='pos'&&!ct)b.title=tituloPos(e);
     if(s.textContent)b.append(s);
     b.onclick=()=>irA(e,n.mod);d2.append(b)};
@@ -1332,7 +1370,7 @@ var LEG={};
    campana_fl22/catalogo/v5_visor.py en work-3, copiado a all-gallery/). LEG_V5M = las entradas con por_modelo (auto + fl22)
    para el selector «v5 de» del explorador; sin el archivo el visor queda como antes. */
 var LEG_V5M={};
-Promise.all(['legibilidad.json','../catalog/_viewer/legibilidad-auto.json','legibilidad-fl22.json','../catalog/'+ROLLO+'/_viewer/legibilidad-auto.json'].map(url=>(globalThis.visorFetchData || fetch)(url,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([base,auto,fl22,sample])=>{
+if(!window.VISOR_STATIC)Promise.all(['legibilidad.json','../catalog/_viewer/legibilidad-auto.json','legibilidad-fl22.json','../catalog/'+ROLLO+'/_viewer/legibilidad-auto.json'].map(url=>(globalThis.visorFetchData || fetch)(url,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(([base,auto,fl22,sample])=>{
  LEG_V5M={...(auto&&auto.laminas||{}),...(fl22&&fl22.laminas||{}),...(sample&&sample.laminas||{})};
  const d=base||auto||fl22||sample?{laminas:{...(auto&&auto.laminas||{}),...(fl22&&fl22.laminas||{}),...(base&&base.laminas||{}),...(sample&&sample.laminas||{})}}:null;
  if(d&&d.laminas){LEG=d.laminas;const seg={};LAM.forEach(e=>{const b=[e.lam,...e.hojas].map(h=>LEG[h]).filter(l=>l&&Number.isFinite(l.max)).sort((a,b)=>b.max-a.max)[0];if(b)seg[e.lam]=b});Object.assign(LEG,seg);CARPETAS.forEach(v=>v.sort(compareV5Lamina));ARB=armar(vistaModo);pintarArbol();if(window.xpRepintar)window.xpRepintar();if(window.v5HistRepintar)window.v5HistRepintar();}}).catch(()=>{});
@@ -1350,8 +1388,9 @@ Promise.all(['compuertas.json','compuertas-painting.json','compuertas-work3.json
 addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  if(manifest.length){if(!applyHash()){
   /* multi-rollo: sin hash, abrir una serie del ?rollo= pedido (si la hay); si no, la primera de siempre */
-  const ped=new URLSearchParams(location.search).get('rollo');
-  const i=ped?manifest.findIndex(g=>(g.scroll||(g.catalogMeta&&g.catalogMeta.scroll))===ped):-1;
+  const ped=new URLSearchParams(location.search).get('scroll');
+  const i=ped?manifest.findIndex(g=>(g.scroll||(g.catalogMeta&&g.catalogMeta.scroll))===ped)
+   :manifest.findIndex(g=>g.id===window.VISOR_STATIC?.defaultSeriesId);
   if(i>=0)select(i);else{const pri=CARPETAS.get(ORDEN[0]);pri&&pri.length?irA(pri[0]):select(0)}}}else {
   $('notice').textContent=catalogTotalSeries?'No verified mesh associations are available in this view. Enable Unverified in the explorer to browse the available maps.':'No maps are available in the loaded manifest.';
   $('notice').hidden=false;im.hidden=true;$('download').removeAttribute('href');
@@ -1422,6 +1461,38 @@ addEventListener(window.VISOR_STATIC?.readyEvent || 'DOMContentLoaded',()=>{
  };
  $('exp').textContent='download pair';
  $('exp').title='Download inklabels and supervision PNGs from one snapshot, with matching depth and grid metadata. Allow multiple downloads in the browser.';
+ if(window.VISOR_STATIC){
+  $('exp').textContent='Download masks';
+  if(window.VISOR_STATIC.hasPublishedLabels)window.VISOR_STATIC.importPublishedLabel=async()=>{
+   const url=window.VISOR_STATIC.publishedLabel, target=destinoMascara();
+   if(!url||!target||!window.annotationImageReady())throw new Error('Wait for the native label and mask to load.');
+   if(!window.mascaraVacia()&&!confirm('Replace the working mask with the published label? You can undo this.'))return;
+   const revision=window.revisionMascara(target.info);
+   const response=await fetch(url,{credentials:'omit'});
+   if(!response.ok)throw new Error('Could not load the published label (HTTP '+response.status+').');
+   const pixels=await leerPngMascara(await response.blob(),target.w,target.h);
+   if(!window.annotationImageReady()||url!==window.VISOR_STATIC.publishedLabel||!destinoVigente(target)||
+      revision!==window.revisionMascara(target.info))
+    throw new Error('The active label changed during loading. Try again on the current label.');
+   const out=new ImageData(target.w,target.h);
+   for(let i=0;i<pixels.data.length;i+=4){
+    const value=pixels.data[i];
+    if(pixels.data[i+3]!==255||pixels.data[i+1]!==value||pixels.data[i+2]!==value||![0,1,2,255].includes(value))
+     throw new Error('Unexpected class in the published label.');
+    if(value===0||value===1){out.data.set(value===1?COLOR.tinta:COLOR.no,i);out.data[i+3]=255}
+   }
+   if(reemplazarMascara(out,target))msg('Published label loaded. Undo restores the previous mask.');
+  };
+  window.VISOR_STATIC.captureMaskPair=async()=>{
+   if(!window.annotationImageReady())throw new Error('Wait for the native image and mask to load.');
+   const snapshot=capturar();
+   if(snapshot.vacia)throw new Error('Paint or load a label before uploading.');
+   const blobs=await codificar(snapshot);
+   const {scroll,segmento:segment,profundidad:depth,par_id:pairId}=snapshot.corrida;
+   return {files:snapshot.nombres.map((name,index)=>({name,blob:blobs[index]})), scroll, segment, depth, pairId};
+  };
+  return;
+ }
  const base64=b=>new Promise((ok,mal)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=()=>mal(r.error||new Error('Could not read PNG'));r.readAsDataURL(b)});
  // ponytail: one upload queue preserves snapshot order; per-destination queues if throughput matters.
  let subiendo=Promise.resolve();

@@ -1,6 +1,7 @@
 /* Per-scroll physical scale comes from the selected dataset. Missing scale stays unknown. */
 (function(){
- var pedido=new URLSearchParams(location.search).get('rollo');
+ var query=new URLSearchParams(location.search);
+ var pedido=query.get('scroll')||query.get('rollo');
  var porOrigen=window.VISOR_ORIGEN?.scroll||window.ROLLO_SERVIDOR?.scroll;
  var rollo=(pedido&&/^PHerc[0-9A-Za-z]+$/.test(pedido))?pedido:porOrigen||'PHerc1447';
  window.ROLLO=rollo;window.ROLLO_CORTO=rollo.replace(/^PHerc/,'');

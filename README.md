@@ -190,10 +190,17 @@ The guide covers [persistent Linux services](docs/guide.md#deploy-on-your-own-se
 Use the source menu in the header to switch datasets. Each selection has a shareable URL.
 
 - **All official maps** opens the Vesuvius Challenge catalog. Published JPEGs are browse-only previews with a link to the original TIFF. **Full resolution** decodes supported TIFFs over HTTPS or localhost (single-page unsigned grayscale or RGB, up to 16 bits, 32 MiB and 16 million pixels, at most 16,384 pixels per side).
-- **All ink-labels** opens VSkinox’s published comparison for every entry, with CT, style A and style C side by side. Choose a label style (A–D) to inspect its native pixels with a class palette and open the original PNG. Individual CT depth layers are available in the Python viewer. [Dataset and attribution](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels)
+- **VSKinox Label Collection** opens VSkinox’s published comparison for every entry, with CT, style A and style C side by side. Choose a label style (A–D) to inspect its native pixels with a class palette and open the original PNG. Individual CT depth layers are available in the Python viewer. [Dataset and attribution](https://huggingface.co/datasets/vincentl065/herculaneum-ink-labels)
 - **Custom HTTP / S3** accepts an image URL, a JSON viewer manifest, an indexed dataset root or a public `s3://bucket/prefix/`. A prefix in the official bucket filters the catalog when matching maps exist. Other unindexed S3 prefixes need public `ListBucket` access to discover images. An indexed source only needs readable objects. Remote hosts must allow cross-origin GET requests from the Pages origin; use HTTPS URLs on the public site.
 
-Native-resolution maps support local labeling and PNG export. GPU inference, CT cross-sections, server crops and shared annotation saves require the Python service.
+On a native-resolution map, **Label** opens the editor. For an official TIFF preview, select **Label** and click the map to edit a native crop of up to 2048 × 2048 pixels. **Whole map** returns to the preview. In the VSKinox comparison, **Label** opens native style A. Choose another style if needed and use **Load published label** to start from its pixels. Ignored and outside pixels stay unsupervised.
+
+Use **Download masks** to save the ink and supervision PNGs locally, or **Upload masks** to send the same pair to one of these destinations:
+
+- **Hugging Face** commits both files together to an existing dataset with a token that has write access. Each export goes into a new folder named for its scroll, segment and depth.
+- **Amazon S3** takes one HTTPS presigned PUT URL per PNG. Sign for `image/png` or leave the content type unsigned. The bucket must allow PUT requests with `Content-Type` from the viewer's origin in its CORS configuration. Use fresh object keys to retain previous uploads.
+
+GPU inference, CT cross-sections and server crops require the Python service.
 
 To publish, select **Settings → Pages → Build and deployment → GitHub Actions**, then run **Static viewer on GitHub Pages** from the Actions tab. Each build refreshes both catalog indexes. To try the same build locally:
 

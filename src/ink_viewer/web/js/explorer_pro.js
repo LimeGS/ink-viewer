@@ -6,6 +6,7 @@
    available behind the "Tree" button. Reads the viewer's own data (LAM, CG, LEG, MSK) - nothing duplicated. */
 (function(){
  if(typeof LAM==='undefined'||typeof irA!=='function'){console.warn('explorer_pro: viewer globals missing');return}
+ const publicViewer=!!window.VISOR_STATIC;
  let OBJ=null,EXCL={},PROPS=new Set();if (!window.VISOR_STATIC) fetch('/api/propuestas',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{PROPS=new Set(l);pintar()}).catch(()=>{});
 let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(l=>{MASC=new Set(l);pintar()}).catch(()=>{});
 (globalThis.visorFetchData || fetch)('objetivo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d){OBJ=d.objetivo;EXCL=d.excluir||{};pintar()}}).catch(()=>{});
@@ -48,14 +49,14 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  const okFlag=(f,v)=>f===''||(f==='yes'?v:!v);
  function filtrar(rows){const q=F.q.trim().toLowerCase();return rows.filter(r=>{
   if(F.rollo&&r.rollo!==F.rollo)return false;
-  if(q&&!(r.hs.some(h=>h.toLowerCase().includes(q))||(r.e.fam||'').toLowerCase().includes(q)))return false;
+  if(q&&!(segmentDisplayName(r.e).toLowerCase().includes(q)||r.hs.some(h=>h.toLowerCase().includes(q))||(r.e.fam||'').toLowerCase().includes(q)))return false;
   if(!okTri(F.cert,r.cert)||!okTri(F.valid,r.valid)||!okTri(F.ct,r.ct)||!okTri(F.flat,r.flat)||!okTri(F.cont,r.cont)||!okTri(F.a4,r.a4))return false;
   if(F.amin!==''&&!(r.cm!=null&&r.cm>=+F.amin))return false;if(F.amax!==''&&!(r.cm!=null&&r.cm<=+F.amax))return false;
   if(F.v5min!==''&&!(r.v5!=null&&r.v5>=+F.v5min))return false;if(F.v5max!==''&&!(r.v5!=null&&r.v5<=+F.v5max))return false;if(F.isomax!==''&&!(r.iso!=null&&r.iso<=+F.isomax))return false;
   if(F.zmin!==''&&!(r.z!=null&&r.z>=+F.zmin))return false;if(F.zmax!==''&&!(r.z!=null&&r.z<=+F.zmax))return false;
   if(F.ctmin!==''&&!(r.ctp!=null&&r.ctp>=+F.ctmin))return false;if(F.c17&&r.nc<17)return false;
   if(!okFlag(F.rep,r.rep)||!okFlag(F.piece,r.piece)||!okFlag(F.lab,r.lab)||!okFlag(F.star,r.star))return false;if(F.unseen&&r.seen)return false;return true})}
- const ORD={sizescore:r=>(r.cm??0)*(r.v5??-1),area:r=>r.cm??-1,v5:r=>r.v5??-1,iso:r=>r.iso??1e9,z:r=>r.z??-1,name:r=>r.lam,ct:r=>r.ctp??-1};
+ const ORD={sizescore:r=>(r.cm??0)*(r.v5??-1),area:r=>r.cm??-1,v5:r=>r.v5??-1,iso:r=>r.iso??1e9,z:r=>r.z??-1,name:r=>segmentDisplayName(r.e),ct:r=>r.ctp??-1};
  function ordenar(rows){if(F.sort==='area_v5')return rows.sort((a,b)=>{for(const key of ['cm','v5']){const x=a[key],y=b[key],vx=Number.isFinite(x),vy=Number.isFinite(y);if(vx!==vy)return vx?-1:1;if(vx&&x!==y)return F.desc?y-x:x-y}return a.lam.localeCompare(b.lam)});const k=ORD[F.sort]||ORD.area;rows.sort((a,b)=>{const x=k(a),y=k(b);return typeof x==='string'?x.localeCompare(y):x-y});if(F.desc)rows.reverse();return rows}
  /* ---- presets: they SET the controls, nothing hidden ---- */
  const PRE=[['Submission',{cert:'pass',valid:'pass',ct:'pass',flat:'pass',cont:'pass',a4:'pass',sort:'area',desc:true},'All gates pass and area >= 4 cm2: the First Letters bar'],
@@ -91,7 +92,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
   ['cont','Cont','C','parametrisation continuity: no jumps between neighbouring cells'],
   ['a4','Area','A','area ≥ 4 cm², the First Letters bar (a submission gate, not a training one)']];
  const chips=GATES.map(([k,n])=>[k,n]);const flags=[['rep','repaired'],['piece','piece'],['lab','mask'],['star','★']];
- panel.innerHTML='<div class="row" id="xpSearch"><input type="search" id="xpQ" placeholder="Search segment, lamina or family" aria-label="Search segments" autocomplete="off"><select id="xpRollo" aria-label="Scroll"><option value="">All scrolls</option>'+[...new Set([ROLLO_CORTO,'1218','0306B','0800'])].map(r=>'<option value="'+r+'">'+r+'</option>').join('')+'</select></div>'+
+ panel.innerHTML='<div class="row" id="xpSearch"><input type="search" id="xpQ" placeholder="Search segment, lamina or family" aria-label="Search segments" autocomplete="off"><select id="xpRollo" aria-label="Scroll"><option value="">All scrolls</option>'+(publicViewer?[]:[...new Set([ROLLO_CORTO,'1218','0306B','0800'])]).map(r=>'<option value="'+r+'">'+r+'</option>').join('')+'</select></div>'+
   '<div class="row" id="xpOrder"><label>Sort <select id="xpSort"><option value="area_v5">Area, then v5</option><option value="area">Area</option><option value="sizescore">Size × score</option><option value="v5">v5</option><option value="iso">Isometry</option><option value="z">z</option><option value="ct">CT %</option><option value="name">Name</option></select></label><button id="xpDir" class="pre" aria-label="Reverse sort direction">↓</button><label>v5 <select id="xpV5m" title="Which v5 feeds the column, filter and sorting. Percentiles are within scroll and model. v5 R2B is experimental: ranking, not certification."><option value="">Best run</option><option value="base">BASE</option><option value="ra_congelado">R-A congelado</option><option value="r3f">r3f</option><option value="r3f_evo">r3f-evo (R-D)</option><option value="pct">Percentile</option></select></label></div>'+
   '<div id="xpControls"><div class="row" id="xpPre"><select id="xpPreset" aria-label="Apply explorer preset"><option value="">Apply preset…</option>'+PRE.slice(0,-1).map(([t,,d],i)=>'<option value="'+i+'" title="'+d+'">'+t+'</option>').join('')+'</select><button id="xpClear" class="pre">Clear</button></div><div id="xpActive" class="row" aria-label="Active filters" hidden></div>'+
   '<div class="xpSections"><details id="xpFilters"><summary>Filters <span id="xpFilterCount"></span></summary><div class="xpFilterBody"><fieldset><legend>Quality gates</legend><div id="xpChips" class="xpFields"></div></fieldset>'+
@@ -99,6 +100,28 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
   '<fieldset><legend>Annotations & status</legend><div id="xpFlags" class="xpFields"></div><div class="row xpChecks"><label><input type="checkbox" id="xpC17"> 17 centres</label><label><input type="checkbox" id="xpUnseen"> Unseen</label></div></fieldset></div></details>'+
   '<details id="xpStats"><summary>Data & counts</summary><div class="row xpChecks"><label title="Also list series whose mesh association is unverified. Reloads the page."><input type="checkbox" id="xpSinVer"> Unverified meshes</label><button id="xpWarm" class="pre" title="Download every depth of the listed segments into the proxy cache. Click again to stop.">Warm cache</button></div><div id="xpTally" class="tally"></div></details></div></div>'+
   '<div class="row" id="xpResults"><b id="xpCount"></b><span class="lbl" id="xpHint">j/k move · Enter open · s star</span></div><div id="xpHead"><span></span><span>segment</span><span class="num"><i class="hh" data-c="1"></i>cm²</span><span class="num"><i class="hh" data-c="2"></i>v5</span><span><i class="hh" data-c="3"></i>gates</span></div><div id="xpList"></div>';
+ const sortOptions=[...panel.querySelector('#xpSort').options];
+ if(publicViewer){
+  panel.querySelector('#xpControls').style.display='none';
+  panel.querySelector('#xpV5m').closest('label').style.display='none';
+  panel.classList.add('xpPublic');
+  st.textContent+='body #xp.xpPublic #xpHead,body #xp.xpPublic #xpList .r{grid-template-columns:var(--xpc0) minmax(0,1fr) var(--xp-public-area,0px);column-gap:0}'+
+   'body #xp.xpPublic #xpHead>span:nth-child(n+4),body #xp.xpPublic #xpList .r>span:nth-child(n+4),'+
+   'body #xp.xpPublic:not(.xpHasArea) #xpHead>span:nth-child(3),body #xp.xpPublic:not(.xpHasArea) #xpList .r>span:nth-child(3){display:none}'+
+   'body #xp.xpPublic.xpHasArea{--xp-public-area:var(--xpc1)}';
+ }
+ function updatePublicControls(rows){
+  const metrics={name:true,area:rows.some(row=>Number.isFinite(row.cm)),iso:rows.some(row=>Number.isFinite(row.iso)),
+   z:rows.some(row=>Number.isFinite(row.z)),ct:rows.some(row=>Number.isFinite(row.ctp))};
+  const sort=$('xpSort'),choices=sortOptions.filter(option=>metrics[option.value]);
+  if(choices.map(option=>option.value).join()!==[...sort.options].map(option=>option.value).join()){
+   sort.replaceChildren(...choices);
+  }
+  if(!choices.some(option=>option.value===F.sort)){F.sort='name';F.desc=false}
+  panel.classList.toggle('xpHasArea',metrics.area);
+  if(F.rollo&&!rows.some(row=>row.rollo===F.rollo))F.rollo=DEF.rollo;
+  for(const key of ['cert','valid','ct','flat','cont','a4','amin','amax','v5min','v5max','isomax','zmin','zmax','ctmin','c17','rep','piece','lab','star','unseen','v5m'])F[key]=DEF[key];
+ }
  const bThumb=document.createElement('button');bThumb.id='xpThumbs';bThumb.className='pre';bThumb.textContent='Thumbnails';
  bThumb.title='Show segment thumbnails (r3f, then R-A congelado, then BASE; fixed contrast, nearest to c+00)';
  const vista=$('vista'),view=document.createElement('select');view.id='xpView';view.setAttribute('aria-label','Explorer view');
@@ -170,7 +193,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  ctl.forEach(([id,k,t])=>{const e=$(id);e.oninput=()=>{F[k]=t==='bool'?e.checked:e.value;pintar()}});$('xpDir').onclick=()=>{F.desc=!F.desc;pintar()};
  bThumb.onclick=()=>{F.thumbs=!F.thumbs;save();armarFlat();$('xpList').scrollTop=0;pintarVentana();sync()};
  window.xpRepintar=()=>pintar();
- const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
+ const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('unverified');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
  function sync(){ctl.forEach(([id,k,t])=>{const e=$(id);if(t==='bool')e.checked=!!F[k];else if(document.activeElement!==e)e.value=F[k];if(t==='num')e.classList.toggle('on',F[k]!=='')});syncView();$('xpDir').textContent=F.desc?'↓':'↑';$('xpDir').title=F.desc?'Descending — reverse sort':'Ascending — reverse sort';activeFilters();bThumb.classList.toggle('on',!!F.thumbs);bThumb.setAttribute('aria-pressed',String(!!F.thumbs))}
  let ROWS=[],VIS=[],FLAT=[],LABS=new Set();const ABIERTAS=new Set();
  /* 24-sep: a segment row unfolds into its maps (one per lamina x model x face), the segment's own maps first */
@@ -200,20 +223,19 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
    return '<span class="g" title="'+title+'">'+label+' · '+q.profile+'</span>'}
   return '<span class="g" title="'+GATES.map(([k,n,L])=>L+' '+n+': '+(r[k]===true?'pass':r[k]===false?'fail':'unmeasured')).join('\n')+'">'
   +GATES.map(([k,,L])=>{const v=r[k];return v===true?'<b>'+L+'</b>':v===false?'<s>'+L+'</s>':'<u>'+L+'</u>'}).join(' ')+'</span>'}
- function pintar(){save();sync();pintarChips();LABS=new Set(Object.keys(typeof MSK!=='undefined'?MSK:{}).map(k=>k.slice(0,k.lastIndexOf('|'))));ROWS=[...LAM.values()].map(fila);VIS=ordenar(filtrar(ROWS));armarFlat();const act=typeof lamActual==='function'?lamActual():null;
-  const tot=VIS.reduce((s,r)=>s+(r.cm||0),0);
-  const areas=VIS.filter(r=>r.cm!=null).length;
-  {const T=GATES.map(([k])=>{let p=0,f=0,u=0;ROWS.forEach(r=>{r[k]===true?p++:r[k]===false?f++:u++});
+ function pintar(){pintarChips();LABS=new Set(Object.keys(typeof MSK!=='undefined'?MSK:{}).map(k=>k.slice(0,k.lastIndexOf('|'))));ROWS=[...LAM.values()].map(fila);if(publicViewer)updatePublicControls(ROWS);save();sync();VIS=ordenar(filtrar(ROWS));armarFlat();
+  if(!publicViewer){const T=GATES.map(([k])=>{let p=0,f=0,u=0;ROWS.forEach(r=>{r[k]===true?p++:r[k]===false?f++:u++});
     return '<tr><th scope="row">'+gateLabels[k]+'</th><td class="p">'+p+'</td><td class="f">'+f+'</td><td class="u">'+u+'</td></tr>'}).join('');
    $('xpTally').innerHTML='<table><caption>All segments · quality gates</caption><thead><tr><th>Gate</th><th>Pass</th><th>Fail</th><th>Unmeasured</th></tr></thead><tbody>'+T+'</tbody></table>'}const nf=['rollo','cert','valid','ct','flat','cont','a4','amin','amax','v5min','v5max','isomax','zmin','zmax','ctmin','rep','piece','lab','star'].filter(k=>F[k]!=='').length+(F.c17?1:0)+(F.unseen?1:0)+(F.q.trim()?1:0);/* 24-sep: segment (row) > map (lamina x model x face, nested) > depth */
- let nGal=0,nProf=0;
- VIS.forEach(r=>{nGal+=r.e.items.length;
-  r.e.items.forEach(it=>{const g=manifest[it.i];if(g.catalogMeta?.depthKnown!==false)nProf+=Object.keys(g.frames||{}).length})});
-    window.XPVIS=nf?new Set(VIS.map(r=>r.lam)):null;
- if(F.modo==='tree'&&typeof pintarArbol==='function')try{pintarArbol()}catch(e){}
- $('xpCount').innerHTML=VIS.length+' of '+ROWS.length+' segments · '+(areas?tot.toFixed(1)+' cm²'+(areas<VIS.length?' ('+areas+' measured)':''):'area unmeasured')
-  +'<span class="lbl"> — '+nGal+' maps · '+nProf+' depths</span>'
-  +(nf?' · '+nf+' filter'+(nf>1?'s':'')+' active':'');
+  let maps=0,depths=0;
+  for(const row of VIS){
+   maps+=row.e.items.length;
+   for(const item of row.e.items)depths+=Math.max(1,Object.keys(manifest[item.i].frames||{}).length);
+  }
+  window.XPVIS=nf?new Set(VIS.map(r=>r.lam)):null;
+  if(F.modo==='tree'&&typeof pintarArbol==='function')try{pintarArbol()}catch(e){}
+  const count=(n,label)=>n+' '+label+(n===1?'':'s');
+  $('xpCount').textContent=[count(VIS.length,'segment'),count(maps,'ink map'),count(depths,'depth')].join(' / ');
   $('xpList').scrollTop=0;pintarVentana()}
  function pintarVentana(){
   const L=$('xpList'),z=$('xpZoom');if(z)z.hidden=true;if(F.modo!=='list')return;
@@ -228,7 +250,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
   FLAT.slice(start,end).forEach(r=>{const rowKey=r.sub?'run:'+r.it.i:'segment:'+r.lam,cached=visibleRows.get(rowKey);
    if(cached){cached.classList.toggle('sel',r.sub?manifest[r.it.i]===group:r.lam===act);cached.classList.toggle('seen',!!(r.sub?r.r.seen:r.seen));frag.append(cached);nextRows.set(rowKey,cached);return}
    if(r.sub){const d=subFila(r);frag.append(d);nextRows.set(rowKey,d);return}const d=document.createElement('div');d.className='r'+(F.thumbs?' th':'')+(r.lam===act?' sel':'')+(r.seen?' seen':'');d.dataset.lam=r.lam;
-   d.innerHTML='<span class="star'+(r.star?' on':'')+'">★</span><span class="n" title="'+r.lam+(r.e.fam?' · '+r.e.fam:'')+(r.z!=null?' · z '+r.z:'')+(r.iso!=null?' · iso '+r.iso.toFixed(2)+' %':'')+(r.ctp!=null?' · CT '+r.ctp.toFixed(1)+' %':'')+(r.nc?' · '+r.nc+' centres':'')+(r.hs.length>1?' · laminae: '+r.hs.slice(1).join(', '):'')+'">'+'<span class="tg" title="show / hide its maps">'+(ABIERTAS.has(r.lam)?'▾':'▸')+r.e.items.length+'</span> '+(r.hs.some(h=>PROPS.has(h)||PROPS.has((typeof segId==='function')?segId(h):h))?'<span title="automatic mask proposal available: Label > import proposal">📋</span> ':'')+(r.hs.includes(OBJ)?'<span title="TARGET lamina">🎯</span> ':((x=>x!=null?'<span style="color:#f08a95" title="overlaps the target mesh '+EXCL[x]+' % - excluded from training">⊘</span> ':'')(r.hs.find(h=>EXCL[h]!=null))))+(r.rep?'<span style="color:#86dcd5">↻</span> ':'')+(r.lab?'<span style="color:#ffb347">✎</span> ':'')+r.lam+(r.hs.length>1?'<span class="lbl"> · '+r.hs[1]+(r.hs.length>2?' +'+(r.hs.length-2):'')+'</span>':'')+'</span>'+
+   d.innerHTML='<span class="star'+(r.star?' on':'')+'">★</span><span class="n" title="'+segmentDisplayName(r.e)+(r.e.fam?' · '+r.e.fam:'')+(r.z!=null?' · z '+r.z:'')+(r.iso!=null?' · iso '+r.iso.toFixed(2)+' %':'')+(r.ctp!=null?' · CT '+r.ctp.toFixed(1)+' %':'')+(r.nc?' · '+r.nc+' centres':'')+(r.hs.length>1?' · laminae: '+r.hs.slice(1).join(', '):'')+'">'+'<span class="tg" title="show / hide its maps">'+(ABIERTAS.has(r.lam)?'▾':'▸')+r.e.items.length+'</span> '+(r.hs.some(h=>PROPS.has(h)||PROPS.has((typeof segId==='function')?segId(h):h))?'<span title="automatic mask proposal available: Label > import proposal">📋</span> ':'')+(r.hs.includes(OBJ)?'<span title="TARGET lamina">🎯</span> ':((x=>x!=null?'<span style="color:#f08a95" title="overlaps the target mesh '+EXCL[x]+' % - excluded from training">⊘</span> ':'')(r.hs.find(h=>EXCL[h]!=null))))+(r.rep?'<span style="color:#86dcd5">↻</span> ':'')+(r.lab?'<span style="color:#ffb347">✎</span> ':'')+segmentDisplayName(r.e)+(r.hs.length>1?'<span class="lbl"> · '+r.hs[1]+(r.hs.length>2?' +'+(r.hs.length-2):'')+'</span>':'')+'</span>'+
     '<span class="num">'+(r.cm!=null?r.cm.toFixed(2):'—')+'</span><span class="num" title="v5 legibility'+(r.v5c!=null?' @c'+r.v5c:'')+(r.v5m?' · '+r.v5m:'')+(r.v5p!=null?' · p'+r.v5p.toFixed(1)+' within scroll and model':'')+'">'+(r.v5==null?'—':F.v5m==='pct'?'p'+r.v5p.toFixed(1):r.v5.toFixed(3))+'</span>'+marca(r);
    d.title=meshTooltip(r.e.items);d.querySelector('.n').title+='\n'+d.title;
    if(F.thumbs){const first=thumbDe(r),base=thumbDe(r,/base/i),thumbs=[first,...(base&&base.u!==first?.u?[base]:[])].filter(Boolean),box=document.createElement('div');box.className='thumbs';d.append(box);thumbs.forEach(t=>{if(t.u){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=modCorto(t.m)+' · c'+(+t.c>=0?'+':'')+t.c;figure.append(caption);box.append(figure);const im=document.createElement('img');im.className='th';im.alt=modCorto(t.m)+' preview';im.decoding='async';im.tabIndex=0;
@@ -257,7 +279,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  /* keep the selection mark in sync when the viewer changes lamina by other means */
  new MutationObserver(()=>{if(F.modo!=='list')return;const act=typeof lamActual==='function'?lamActual():null,gi=manifest.indexOf(group);$('xpList').querySelectorAll('.r').forEach(d=>d.classList.toggle('sel',d.dataset.i!=null?+d.dataset.i===gi:d.dataset.lam===act));}).observe($('count')||document.body,{childList:true,characterData:true,subtree:true});
  /* 27-sep: #xprollo=0800&xpsort=v5&xpv5m=ra_congelado (tambien xpdesc=0|1, xpv5min, xpq) fija el explorador al abrir */
- {const h=new URLSearchParams(location.hash.slice(1)),M={xprollo:'rollo',xpsort:'sort',xpv5m:'v5m',xpv5min:'v5min',xpq:'q'};let hay=false;
+ {const h=new URLSearchParams(location.hash.slice(1)),M={xpscroll:'rollo',xpsort:'sort',xpv5m:'v5m',xpv5min:'v5min',xpq:'q'};let hay=false;
   for(const [k,f] of Object.entries(M))if(h.has(k)){F[f]=h.get(k);hay=true}
   if(h.has('xpdesc')){F.desc=h.get('xpdesc')!=='0';hay=true}
   if(hay){F.modo='list';save()}}

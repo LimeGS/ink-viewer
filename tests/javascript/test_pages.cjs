@@ -10,8 +10,8 @@ const root = 'https://data.example.org/run/';
 const frame = '../catalog/PHerc123/segments/segment/ink-detection/map.tif';
 const entries = [{id: 'series', scroll: 'PHerc123', frames: {0: frame}}];
 
-async function open(source, files, version) {
-  const html = '<header></header><div id="notice"></div><button id="etiq"></button><a id="download"></a>';
+async function open(source, files, version, decoder = false) {
+  const html = '<header><span id="count"></span></header><footer><span id="title"></span></footer><div id="notice"></div><button id="etiq"></button><a id="download"></a>';
   const dom = new JSDOM(html, {url: page + '?source=' + encodeURIComponent(source), runScripts: 'outside-only'});
   const w = dom.window;
   if (version) Object.defineProperty(w.document, 'currentScript', {value: {src: page + 'pages.js?v=' + version}});
@@ -23,6 +23,9 @@ async function open(source, files, version) {
     if (typeof body === 'string') return new Response(body, {headers: {'Content-Type':'application/xml'}});
     return Object.hasOwn(files, url.href) ? Response.json(body) : new Response(null, {status: 404});
   };
+  if (decoder) Object.defineProperty(w.navigator, 'serviceWorker', {
+    value: {register: async () => ({}), controller: {scriptURL: page + 'raster-worker.js'}},
+  });
   w.OFFICIAL_FRAME = /^\.\.\/catalog\/.+\/ink-detection\//;
   w.etiqOn = false;
   w.previewOf = () => null;
@@ -34,11 +37,14 @@ test('official catalog uses its published preview, locks labeling and retains th
   const file = 'PHerc123/segments/segment/ink-detection/map.tif';
   const w = await open('official', {[page + 'official.json']: {root: root.slice(0,-1), entries, previews: {[file]: 'small.jpg'}}}, 'test-version');
   try {
+    assert.equal(w.VISOR_STATIC.defaultSeriesId, 'official_0181c8dd4c267c2b5e04');
     const map = w.VISOR_STATIC.select(frame, 'fixed');
     assert.equal(map.original, root + file);
     assert.equal(w.VISOR_STATIC.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
     assert.equal(w.document.querySelector('#etiq').disabled, true);
     assert.equal(w.visorPuedeGuardar, false);
+    assert(w.document.querySelector('#count').hidden);
+    assert(w.document.querySelector('#title').hidden);
     assert.equal(w.document.querySelector('script').src, page + 'viewer-static.js?v=test-version');
   } finally { w.close(); }
 });
@@ -52,6 +58,7 @@ test('sample and document roots resolve maps, metadata and labels against the ch
     files[root + 'rollos/PHerc123.json'] = {scroll: 'PHerc123', voxel_um: 8.2};
     const w = await open(root, files);
     try {
+      assert.equal(w.VISOR_STATIC.defaultSeriesId, null);
       const folder = layout === 'sample' ? '' : 'catalog/PHerc123/';
       const png = frame.replace(/\.tif$/, '');
       assert.equal(w.VISOR_STATIC.mapUrl(png, 'global'), root + folder + 'segments/segment/ink-detection/map-global.png');
@@ -79,6 +86,7 @@ test('source picker exposes the presets and asks for a path only in custom mode'
     const select = w.document.querySelector('header select'), input = w.document.querySelector('header input');
     assert.deepEqual(Array.from(select.options, o => o.value), ['official', 'ink-labels', 'custom']);
     assert.equal(select.value, 'ink-labels');
+    assert.equal(select.selectedOptions[0].textContent, 'VSKinox Label Collection');
     assert(input.hidden);
     select.value = 'custom'; select.dispatchEvent(new w.Event('change'));
     assert(!input.hidden && input.required);
@@ -106,5 +114,41 @@ test('unindexed S3 prefix consumes every result page and preserves encoded image
   });
   try {
     assert.deepEqual(Array.from(w.manifest, e => e.frames[0]), [bucket + 'maps/a%2Bb.png',bucket + 'maps/b%20c.tif']);
+  } finally { w.close(); }
+});
+
+test('Label on a TIFF preview picks a crop and requests its native grid', async () => {
+  const file = 'PHerc123/segments/segment/ink-detection/map.tif';
+  const w = await open('official', {[page + 'official.json']: {root: root.slice(0,-1), entries, previews: {[file]: 'small.jpg'}}}, undefined, true);
+  try {
+    let choosing = false;
+    const tool = {state: {crop: null}, choose() { choosing = true; }};
+    w.recorteVista = tool;
+    const viewer = w.VISOR_STATIC;
+    assert.equal(viewer.select(frame, 'fixed').preview, true);
+    viewer.prepareLabel();
+    assert.equal(choosing, true);
+    assert.equal(viewer.mapUrl(frame, 'fixed'), root + 'small.jpg?viewer=cors');
+    tool.state.crop = {original: root + file, x:1024, y:2048, ancho:2048, alto:2048};
+    assert.equal(viewer.select(frame, 'fixed').preview, false);
+    const route = new URL(viewer.mapUrl(frame, 'fixed'));
+    assert.equal(route.searchParams.get('crop'), '1024,2048,2048,2048');
+    assert.equal(viewer.mapUrl(frame, 'fixed', 8), root + 'small.jpg?viewer=cors');
+  } finally { w.close(); }
+});
+
+test('Label switches the published comparison to the native style A grid', async () => {
+  const preview = 'https://huggingface.co/datasets/test/resolve/main/entry/preview.jpg';
+  const w = await open('ink-labels', {[page + 'ink-labels.json']: {root, entries}}, undefined, true);
+  try {
+    const viewer = w.VISOR_STATIC, button = w.document.querySelector('#etiq');
+    w.show = () => viewer.select(preview, 'fixed');
+    assert.equal(viewer.select(preview, 'fixed').preview, true);
+    assert.equal(button.disabled, false);
+    viewer.prepareLabel();
+    assert.equal(viewer.reduced, false);
+    const label = new URL('labels/style_A.png', preview).href;
+    assert.equal(viewer.publishedLabel, label);
+    assert.equal(new URL(viewer.mapUrl(preview, 'fixed')).searchParams.get('src'), label);
   } finally { w.close(); }
 });

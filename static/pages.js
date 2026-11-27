@@ -2,13 +2,15 @@
 (async function () {
   const page = new URL(location.href), source = page.searchParams.get('source') || 'official';
   const header = document.querySelector('header'), picker = document.createElement('form');
+  document.getElementById('count').hidden = true;
+  document.getElementById('title').hidden = true;
   const assetQuery = document.currentScript ? new URL(document.currentScript.src).search : '';
   const officialRoot = 'https://vesuvius-challenge-open-data.s3.amazonaws.com';
   const official = ['official', 's3://vesuvius-challenge-open-data', officialRoot].includes(source.replace(/\/+$/, ''));
   const labels = source === 'ink-labels';
   const modes = document.createElement('select'), input = document.createElement('input'), open = document.createElement('button');
   modes.setAttribute('aria-label', 'Data source');
-  for (const [name, key] of [['All official maps', 'official'], ['All ink-labels', 'ink-labels'], ['Custom HTTP / S3', 'custom']]) {
+  for (const [name, key] of [['All official maps', 'official'], ['VSKinox Label Collection', 'ink-labels'], ['Custom HTTP / S3', 'custom']]) {
     modes.add(new Option(name, key));
   }
   modes.value = official ? 'official' : labels ? 'ink-labels' : 'custom';
@@ -239,13 +241,41 @@
     function labelURL(frame) {
       return style.value === 'preview' ? frame : new URL('labels/style_' + style.value + '.png', frame).href;
     }
+    function tiffRoute(original, scale = 1) {
+      const route = new URL('tiff.png', page);
+      route.searchParams.set('src', original);
+      route.searchParams.set('scale', scale);
+      return route;
+    }
+    const cropTool = () => window.recorteVista;
     window.VISOR_STATIC = {
       readyEvent: 'ink-viewer-ready', reduced: false, resource,
-      setReduced(value) {
+      hasPublishedLabels: labels && decode,
+      maskUploadModule: new URL('mask-hub.js' + assetQuery, page).href,
+      prepareLabel() {
+        if (labels && decode && style.value === 'preview') {
+          style.value = 'A';
+          show(true);
+        } else if (this.cropTarget && this.reduced) {
+          cropTool()?.choose();
+        }
+      },
+      cropTarget: null,
+      async cropDimensions(original) {
+        const route = tiffRoute(original);
+        route.searchParams.set('mode', 'dimensions');
+        const response = await fetch(route, {credentials: 'omit'});
+        if (!response.ok) throw new Error(await response.text());
+        return response.json();
+      },
+      // The PHercParis4 map for segment 20230929220926 shows readable text at preview resolution.
+      defaultSeriesId: official ? 'official_0181c8dd4c267c2b5e04' : null,
+      setReduced(value, canOpenNative = false) {
         this.reduced = value;
         if (value) wantOriginal = false;
         full.textContent = wantOriginal ? 'Show preview' : 'Full resolution';
-        const label = document.getElementById('etiq'); label.disabled = value;
+        const label = document.getElementById('etiq'); label.disabled = value && !canOpenNative;
+        label.title = label.disabled ? 'Labeling requires a supported native-resolution image.' : '';
         if (value && etiqOn) modoEtiq(false);
       },
       select(frame, contrast) {
@@ -254,17 +284,24 @@
           entryLink.href = new URL('./', frame).href.replace('/resolve/main/', '/tree/main/');
           labelLegend.textContent = overview ? '' : 'Yellow: ink · blue: background · grey: ignore · black: outside. ';
           document.getElementById('download').textContent = overview ? 'Open comparison ↗' : 'Open raw label ↗';
-          this.setReduced(true);
-          return {original: labelURL(frame), preview: true, caption: overview
-            ? 'Published comparison · CT | label A | label C' : 'Published mask · label style ' + style.value};
+          this.publishedLabel = overview ? null : labelURL(frame);
+          this.setReduced(overview, decode);
+          return {original: labelURL(frame), preview: overview,
+            caption: 'Published comparison · CT | label A | label C'};
         }
         const original = image(frame, contrast), tiff = /\.tiff?$/i.test(new URL(original).pathname);
-        if (selectedURL !== original) { selectedURL = original; wantOriginal = !builtIn; }
+        if (selectedURL !== original) {
+          selectedURL = original;
+          wantOriginal = !builtIn;
+          if (cropTool()) cropTool().state.crop = null;
+        }
         const fallback = tiff && preview(original);
-        const usePreview = !!(fallback && (!wantOriginal || !decode));
-        full.hidden = !(tiff && fallback && decode);
+        this.cropTarget = fallback && decode ? original : null;
+        const cropped = cropTool()?.state.crop?.original === original;
+        const usePreview = !!(fallback && !cropped && (!wantOriginal || !decode));
+        full.hidden = cropped || !this.cropTarget;
         document.getElementById('download').textContent = tiff ? 'Open TIFF ↗' : 'Open image ↗';
-        this.setReduced(usePreview);
+        this.setReduced(usePreview, !full.hidden);
         return {original, preview: usePreview, fallback};
       },
       mapUrl(frame, contrast, scale) {
@@ -276,11 +313,15 @@
         const original = image(frame, contrast);
         if (/\.tiff?$/i.test(new URL(original).pathname)) {
           const jpg = preview(original);
+          const crop = !scale && cropTool()?.state.crop;
+          if (crop && crop.original === original) {
+            const route = tiffRoute(original);
+            route.searchParams.set('crop', [crop.x, crop.y, crop.ancho, crop.alto].join(','));
+            return route.href;
+          }
           if (jpg && (scale || !decode || !wantOriginal)) return jpg;
           if (!decode) return original;
-          const route = new URL('tiff.png', page);
-          route.searchParams.set('src', original); route.searchParams.set('scale', scale || 1);
-          return route.href;
+          return tiffRoute(original, scale || 1).href;
         }
         return scale ? previewOf(original, scale) || original : original;
       }

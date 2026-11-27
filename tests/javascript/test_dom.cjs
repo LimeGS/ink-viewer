@@ -40,6 +40,11 @@ async function viewer(options={}){
  if(options.legacy)w.manifest[0].catalogMeta.modelo='base_etiq';
  if(options.models)for(const model of ['r3f','ra_congelado']){const run=JSON.parse(JSON.stringify(w.manifest[0]));run.id='fixture-'+model;run.catalogMeta.modelo=model;w.manifest.push(run)}
  if(options.calibrated){w.VISOR_BOOTSTRAP.rollos.PHerc0175A={scroll:'PHerc0175A',voxel_um:10,paso_hoja_um:[20,40]};w.manifest.forEach(g=>{g.catalogMeta.physicalScaleVerified=true;g.catalogMeta.um_por_px=10})}
+ if(options.publicExplorer){
+  w.VISOR_STATIC={readyEvent:'DOMContentLoaded',mapUrl:frame=>frame+'.png',select:()=>null,resource:path=>path};
+  w.localStorage.setItem('vesuvius.sinVerificar@fixture','0');
+  w.localStorage.setItem('vesuvius.explorer.v1@fixture',JSON.stringify({sort:'v5',cert:'pass',v5min:'0.2',v5m:'r3f',rollo:'missing'}));
+ }
  const context=dom.getInternalVMContext();
  const run=name=>vm.runInContext(read(name),context,{filename:sourcePath(name)});
  try{for(const name of ['deploy_badge.js','origen.js','rollo_visor.js','etiquetar.js','etiq_vc3d.js','viewer.js',
@@ -47,6 +52,34 @@ async function viewer(options={}){
  await new Promise(resolve=>setTimeout(resolve,30));
  return {dom,w,context,errors};
 }
+
+test('the static explorer hides internal controls and ignores saved filters for missing metadata',async()=>{
+ const {dom,w,context,errors}=await viewer({publicExplorer:true,skip:['hist_v5.js']});
+ try{
+  const el=id=>w.document.getElementById(id);
+  const sorts=()=>Array.from(el('xpSort').options,o=>o.value);
+  assert.deepEqual(sorts(),['name']);
+  assert.deepEqual(Array.from(el('xpRollo').options,o=>o.value),['','0175A']);
+  assert.equal(el('xpCount').textContent,'1 segment / 1 ink map / 2 depths');
+  assert.equal(el('xpControls').style.display,'none');
+  assert.equal(el('xpV5m').closest('label').style.display,'none');
+  assert.equal(el('xpTally').textContent,'');
+  assert(!el('xp').classList.contains('xpHasArea'));
+  assert.match(w.document.querySelector('#xpList .r .n').textContent,/PHerc0175A · s/);
+  input(w,'xpQ','PHerc0175A');
+  assert.equal(el('xpCount').textContent,'1 segment / 1 ink map / 2 depths');
+  input(w,'xpView','mod','change');
+  await settle();
+  const treeLabel=w.document.querySelector('#tree .lam');
+  assert.match(treeLabel.textContent,/PHerc0175A · s/);
+  assert.equal(treeLabel.querySelector('small'),null);
+  vm.runInContext("CG={s:{cm2:6,frac_ct:0.95}}",context);
+  w.xpRepintar();
+  assert.deepEqual(sorts(),['area','ct','name']);
+  assert(el('xp').classList.contains('xpHasArea'));
+  assert.deepEqual(errors,[]);
+ }finally{dom.window.close()}
+});
 
 test('whole viewer initializes and supports explorer and depth navigation',async()=>{
  const app=await viewer();
@@ -85,10 +118,31 @@ test('filters, source dialog and Super mosaic retain usable UI state',async()=>{
   for(const id of ['fxTab0','fxTab1','fxTab2','fxTab3','fxTab4'])click(w,id);
   click(w,'superBtn');await settle();
   assert(w.superDebug().V>80);assert(w.document.querySelectorAll('#superGrid .sup').length>80);
+  const titles = [...w.document.querySelectorAll('#superGrid .sup span')].map(tile => tile.textContent);
+  assert.deepEqual(titles.slice(0, 7), [
+   'sobel inv', 'iso4', 'iso8 turbo', 'iso6 DoG8', 'relief turbo', 'lap inv S20', 'raw · p2',
+  ]);
+  assert(titles.indexOf('hot S8') < titles.findIndex(name => name.startsWith('PA6')));
   input(w,'superTam','220','change');input(w,'superProf','2');click(w,'superMax');
   click(w,'superVF');click(w,'superVC');w.superDibujar();
   const exported=w.superPng(false);assert(exported);
-  click(w,'superCerrar');assert.equal(w.superDebug().ov,false);
+  w.document.querySelector('#superGrid .sup').dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true,button:2}));
+  await settle();
+  const menu = w.document.getElementById('superMenu');
+  const action = [...menu.children].find(button => button.textContent === 'Set as main view');
+  action.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true}));
+  assert(menu.isConnected);
+  action.click();
+  await waitFor(() => w.document.getElementById('stage').style.getPropertyValue('--fx') === 'url(#fxSolo)');
+  assert.equal(w.superDebug().ov,false);
+  assert.equal(w.document.querySelector('#panes .pane'),null);
+  assert(w.document.querySelector('#fxSolo feConvolveMatrix'));
+  const filters = JSON.parse(new URLSearchParams(w.location.hash.slice(1)).get('fx'));
+  assert.equal(filters.borde,'sobel');
+  assert.equal(filters.invertir,true);
+  click(w,'superBtn');
+  w.document.querySelector('#superGrid .sup').dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));
+  assert.equal(w.superDebug().ov,false);
   click(w,'origenAbrir');assert(w.document.getElementById('origenDialog').open);
   input(w,'origenTipo','s3','change');input(w,'origenTipo','http','change');input(w,'origenTipo','local','change');
   click(w,'origenCancelar');assert.equal(w.document.getElementById('origenDialog').open,false);
@@ -176,10 +230,12 @@ test('model comparison pins panels, applies filters and preserves measured depth
   assert.equal(vm.runInContext('UM_CAPA',context),10);
   for(const select of ['xpView','xpSort','xpV5m'])for(const option of [...w.document.getElementById(select).options])input(w,select,option.value,'change');
   input(w,'xpView','list','change');click(w,'xpClear');
-  input(w,'xpQ','not-a-segment');assert.match(w.document.getElementById('xpCount').textContent,/0 of/);
+  input(w,'xpQ','not-a-segment');assert.equal(w.document.getElementById('xpCount').textContent,'0 segments / 0 ink maps / 0 depths');
   input(w,'xpQ','');click(w,'xpThumbs');click(w,'xpThumbs');click(w,'xpDir');
   for(const id of ['xpAmin','xpAmax','xpV5','xpV5max','xpZmin','xpZmax','xpIso','xpCt']){input(w,id,'1');input(w,id,'')}
-  click(w,'xpClear');assert.match(w.document.getElementById('xpCount').textContent,/1 of/);
+  click(w,'xpClear');assert.equal(w.document.getElementById('xpCount').textContent,'1 segment / 3 ink maps / 6 depths');
+  const map=w.manifest[0];map.catalogMeta.depthKnown=false;map.frames={0:map.frames[0]};w.xpRepintar();
+  assert.equal(w.document.getElementById('xpCount').textContent,'1 segment / 3 ink maps / 5 depths');
   assert.deepEqual(errors,[]);
  }finally{dom.window.close()}
 });
@@ -277,6 +333,11 @@ test('pan, zoom, deep links and mask stamps preserve selected depth',async()=>{
   assert.equal(w.document.getElementById('depth').value,'0');
   w.history.replaceState(null,'','#id=fixture-run&centro=2&etiq=1&paneles=Inferno,Invertido');
   assert.equal(w.applyHash(),true);await waitFor(()=>w.annotationImageReady());assert.equal(w.document.getElementById('depth').value,'2');
+  const canonical=new URL(w.location.href);
+  assert.equal(canonical.searchParams.get('scroll'),'PHerc0175A');
+  assert(!canonical.searchParams.has('rollo'));
+  assert(!canonical.hash.includes('centro='));
+  assert.equal(new URLSearchParams(canonical.hash.slice(1)).get('depth'),'2');
   assert(w.annotationImageReady());
   const c=w.document.getElementById('mask'),ctx=c.getContext('2d'),data=ctx.createImageData(8,4);data.data.set([60,220,90,255]);ctx.putImageData(data,0,0);
   w.mskGuardar();assert.equal(w.mskPorLamina('s').length,1);

@@ -84,13 +84,25 @@ assert.equal(run('mostrarSinVerificar([],null,"0","1")'),true);
 run(`let group={id:'unverified',catalogMeta:{},frames:{0:'x'}}, projection=false,
   slider={value:0},etiqOn=false,vistaModo='mod',SIN_VERIFICAR=true;
   const history={replaceState(a,b,url){this.url=url}};const idParts=()=>null;`);
-run(section(html, 'function syncHash(', 'function applyHash('));
+run(section(html, 'const viewNames=', 'function applyHash('));
 run('syncHash()');
-assert.equal(new URLSearchParams(run('history.url').slice(1)).get('sinverificar'), '1');
+assert.equal(new URLSearchParams(run('history.url').slice(1)).get('unverified'), '1');
 run(`group={id:'verified',catalogMeta:{},mapAvailable:true,frames:{0:'x'},
   meshAssociation:{status:'VERIFIED',meshId:'m',meshPath:'p',receiptPath:'r'}};syncHash()`);
-assert.equal(new URLSearchParams(run('history.url').slice(1)).has('sinverificar'), false);
-const redirectContext=vm.createContext({URLSearchParams,location:{hash:'#id=target&centro=4'},
+assert.equal(new URLSearchParams(run('history.url').slice(1)).has('unverified'), false);
+run(section(html,'function normalizeViewerLink(', 'function canonicalViewerLink('));
+const url=new URL('https://limegs.github.io/ink-viewer/?source=official&rollo=PHercParis4#id=official_0181c8dd4c267c2b5e04&centro=0&sinverificar=1');
+context.legacyURL=url;
+assert.equal(run('normalizeViewerLink(legacyURL)'),true);
+assert.equal(url.search,'?source=official&scroll=PHercParis4');
+assert.equal(url.hash,'#id=official_0181c8dd4c267c2b5e04&depth=0&unverified=1');
+assert.equal(run('normalizeViewerLink(legacyURL)'),false);
+const mixed=new URL('https://example.test/?scroll=PHercA&rollo=PHercB#depth=2&centro=4&keep=1');
+context.mixedURL=mixed;
+run('normalizeViewerLink(mixedURL)');
+assert.equal(mixed.search,'?scroll=PHercA');
+assert.equal(mixed.hash,'#depth=2&keep=1');
+const redirectContext=vm.createContext({URLSearchParams,canonicalViewerLink:()=>({hash:'#id=target&depth=4'}),
   manifest:[{id:'target'}],group:undefined,select(){}});
 vm.runInContext(section(html,'function applyHash(',"addEventListener('hashchange'"),redirectContext);
 assert.equal(vm.runInContext('applyHash()',redirectContext),true);
