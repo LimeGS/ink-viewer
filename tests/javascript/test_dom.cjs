@@ -176,10 +176,12 @@ test('model comparison pins panels, applies filters and preserves measured depth
   assert.equal(vm.runInContext('UM_CAPA',context),10);
   for(const select of ['xpView','xpSort','xpV5m'])for(const option of [...w.document.getElementById(select).options])input(w,select,option.value,'change');
   input(w,'xpView','list','change');click(w,'xpClear');
-  input(w,'xpQ','not-a-segment');assert.match(w.document.getElementById('xpCount').textContent,/0 of/);
+  input(w,'xpQ','not-a-segment');assert.equal(w.document.getElementById('xpCount').textContent,'0 segments / 0 ink maps / 0 depths');
   input(w,'xpQ','');click(w,'xpThumbs');click(w,'xpThumbs');click(w,'xpDir');
   for(const id of ['xpAmin','xpAmax','xpV5','xpV5max','xpZmin','xpZmax','xpIso','xpCt']){input(w,id,'1');input(w,id,'')}
-  click(w,'xpClear');assert.match(w.document.getElementById('xpCount').textContent,/1 of/);
+  click(w,'xpClear');assert.equal(w.document.getElementById('xpCount').textContent,'1 segment / 3 ink maps / 6 depths');
+  const map=w.manifest[0];map.catalogMeta.depthKnown=false;map.frames={0:map.frames[0]};w.xpRepintar();
+  assert.equal(w.document.getElementById('xpCount').textContent,'1 segment / 3 ink maps / 5 depths');
   assert.deepEqual(errors,[]);
  }finally{dom.window.close()}
 });
