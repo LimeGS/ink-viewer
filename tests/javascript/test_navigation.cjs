@@ -17,7 +17,7 @@ vm.runInContext(pick(html,'function irARollo(', 'function select('),ctx);
 assert.equal(ctx.ROLLO,'PHercA');assert.equal(ctx.VOXEL_UM,7);
 assert.equal(ctx.irARollo('PHercA','same'),false);assert.equal(location.search,'');
 ctx.irARollo('PHercB','other');assert.equal(ctx.ROLLO,'PHercB');assert.equal(ctx.VOXEL_UM,14);assert.equal(ctx.PASO_HOJA_UM,null);
-assert.equal(new URL(location.href).searchParams.get('rollo'),'PHercB');assert.equal(location.hash,'#id=old&vista=pos');
+assert.equal(new URL(location.href).searchParams.get('scroll'),'PHercB');assert.equal(location.hash,'#id=old&vista=pos');
 assert.equal(ctx.visorUmPorPixel({scroll:'PHercA'}),7,'old-owner provenance retains its calibration');
 ctx.irARollo('PHercUnknown','unknown');assert.equal(ctx.VOXEL_UM,null);assert.equal(ctx.PASO_HOJA_UM,null);
 ctx.irARollo('PHercA','back');assert.equal(ctx.VOXEL_UM,7);assert.deepEqual([...ctx.PASO_HOJA_UM],[50,100]);

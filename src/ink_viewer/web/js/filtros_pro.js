@@ -249,7 +249,8 @@
  im.addEventListener('load',()=>{HIST.src='';if(FX.auto||PANES.some(p=>p.fx.auto)){fxPedir();if(PANES.length){defsPanes()}}pintarHist()});
  /* el deep link (&paneles=) se aplico antes de que existieran los presets nuevos: re-resolverlo */
  try{const u0=((performance.getEntriesByType('navigation')[0]||{}).name)||location.href;   /* el visor ya reescribio el hash: usar la URL con la que se llego */
-  const pv=new URLSearchParams((u0.split('#')[1]||'')).get('paneles');
+  const hash=new URLSearchParams(u0.split('#')[1]||'');
+  const pv=hash.get('panes')??hash.get('paneles');
   if(pv){const q=decodeURIComponent(pv).split(',').map(t=>t.trim()).filter(Boolean).slice(0,4);
    const AL=(window.PRESET_ALIAS||{});const nuevos=q.map(t=>{t=AL[t]||t;const d=FXPRESETS.find(z=>z.t.toLowerCase()===t.toLowerCase());return d?{t:d.t,fx:Object.assign({},FXDEF,d.fx)}:null}).filter(Boolean);
    if(nuevos.length>PANES.length)PANES=nuevos}}catch(e){}

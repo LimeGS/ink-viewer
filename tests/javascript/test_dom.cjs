@@ -279,6 +279,11 @@ test('pan, zoom, deep links and mask stamps preserve selected depth',async()=>{
   assert.equal(w.document.getElementById('depth').value,'0');
   w.history.replaceState(null,'','#id=fixture-run&centro=2&etiq=1&paneles=Inferno,Invertido');
   assert.equal(w.applyHash(),true);await waitFor(()=>w.annotationImageReady());assert.equal(w.document.getElementById('depth').value,'2');
+  const canonical=new URL(w.location.href);
+  assert.equal(canonical.searchParams.get('scroll'),'PHerc0175A');
+  assert(!canonical.searchParams.has('rollo'));
+  assert(!canonical.hash.includes('centro='));
+  assert.equal(new URLSearchParams(canonical.hash.slice(1)).get('depth'),'2');
   assert(w.annotationImageReady());
   const c=w.document.getElementById('mask'),ctx=c.getContext('2d'),data=ctx.createImageData(8,4);data.data.set([60,220,90,255]);ctx.putImageData(data,0,0);
   w.mskGuardar();assert.equal(w.mskPorLamina('s').length,1);

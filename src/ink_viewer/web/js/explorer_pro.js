@@ -170,7 +170,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  ctl.forEach(([id,k,t])=>{const e=$(id);e.oninput=()=>{F[k]=t==='bool'?e.checked:e.value;pintar()}});$('xpDir').onclick=()=>{F.desc=!F.desc;pintar()};
  bThumb.onclick=()=>{F.thumbs=!F.thumbs;save();armarFlat();$('xpList').scrollTop=0;pintarVentana();sync()};
  window.xpRepintar=()=>pintar();
- const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('sinverificar');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
+ const sv=$('xpSinVer');sv.checked=SIN_VERIFICAR;sv.title='Show maps with unverified mesh associations. Warnings remain; this does not verify a mesh.';sv.parentElement.title=sv.title;sv.onchange=()=>{localStorage.setItem(globalThis.VISOR_STATIC?visorKey('vesuvius.sinVerificar'):'vesuvius.sinVerificar',sv.checked?'1':'0');const url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('unverified');url.hash=hash.toString();history.replaceState(null,'',url.href);location.reload()};
  function sync(){ctl.forEach(([id,k,t])=>{const e=$(id);if(t==='bool')e.checked=!!F[k];else if(document.activeElement!==e)e.value=F[k];if(t==='num')e.classList.toggle('on',F[k]!=='')});syncView();$('xpDir').textContent=F.desc?'↓':'↑';$('xpDir').title=F.desc?'Descending — reverse sort':'Ascending — reverse sort';activeFilters();bThumb.classList.toggle('on',!!F.thumbs);bThumb.setAttribute('aria-pressed',String(!!F.thumbs))}
  let ROWS=[],VIS=[],FLAT=[],LABS=new Set();const ABIERTAS=new Set();
  /* 24-sep: a segment row unfolds into its maps (one per lamina x model x face), the segment's own maps first */
@@ -256,7 +256,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  /* keep the selection mark in sync when the viewer changes lamina by other means */
  new MutationObserver(()=>{if(F.modo!=='list')return;const act=typeof lamActual==='function'?lamActual():null,gi=manifest.indexOf(group);$('xpList').querySelectorAll('.r').forEach(d=>d.classList.toggle('sel',d.dataset.i!=null?+d.dataset.i===gi:d.dataset.lam===act));}).observe($('count')||document.body,{childList:true,characterData:true,subtree:true});
  /* 27-sep: #xprollo=0800&xpsort=v5&xpv5m=ra_congelado (tambien xpdesc=0|1, xpv5min, xpq) fija el explorador al abrir */
- {const h=new URLSearchParams(location.hash.slice(1)),M={xprollo:'rollo',xpsort:'sort',xpv5m:'v5m',xpv5min:'v5min',xpq:'q'};let hay=false;
+ {const h=new URLSearchParams(location.hash.slice(1)),M={xpscroll:'rollo',xpsort:'sort',xpv5m:'v5m',xpv5min:'v5min',xpq:'q'};let hay=false;
   for(const [k,f] of Object.entries(M))if(h.has(k)){F[f]=h.get(k);hay=true}
   if(h.has('xpdesc')){F.desc=h.get('xpdesc')!=='0';hay=true}
   if(hay){F.modo='list';save()}}
