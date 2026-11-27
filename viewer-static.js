@@ -1151,9 +1151,15 @@ const segRuta=g=>{for(const f of Object.values(g.frames||{})){const m=/catalog\/
 const SEG_ROLLOS=new Map();manifest.forEach(g=>{const s=segRuta(g);if(s){if(!SEG_ROLLOS.has(s.seg))SEG_ROLLOS.set(s.seg,new Set());SEG_ROLLOS.get(s.seg).add(s.scroll)}});
 const segmentKey=s=>SEG_ROLLOS.get(s.seg)?.size>1?s.scroll+'/'+s.seg:s.seg;
 const filaDe=g=>{const s=segRuta(g);return s?segmentKey(s):meta(g).lam};
+function segmentDisplayName(entry){
+ const {lam:name,scroll}=entry;
+ if(scroll==='PHercCustom'||!/^PHerc[0-9A-Za-z]+$/.test(scroll||''))return name;
+ if(name===scroll||['/','-','_',' '].some(separator=>name.startsWith(scroll+separator)))return name;
+ return scroll+' · '+name;
+}
 const LAM=new Map(),FILA_DE_HOJA={};
 manifest.forEach((g,i)=>{const t=meta(g),s=segRuta(g),k=s?segmentKey(s):t.lam;let e=LAM.get(k);
- if(!e)LAM.set(k,e={lam:k,cm:t.cm,z:t.z,est:t.est,fam:t.fam,catalog:true,scroll:s?.scroll||g.catalogMeta?.scroll||null,items:[],hojas:[]});
+ if(!e)LAM.set(k,e={lam:k,cm:t.cm,z:t.z,est:t.est,fam:t.fam,catalog:true,scroll:s?.scroll||g.scroll||g.catalogMeta?.scroll||null,items:[],hojas:[]});
  if(e.cm==null)e.cm=t.cm;if(!e.z)e.z=t.z;if(!e.est)e.est=t.est;e.catalog=e.catalog&&!!g.catalogMeta;
  if(!e.hojas.includes(t.lam))e.hojas.push(t.lam);FILA_DE_HOJA[t.lam]=k;
  e.items.push({i,modelo:t.modelo,cara:t.cara,hoja:t.lam})});
@@ -1322,17 +1328,17 @@ const etapasTxt=e=>ETAPAS.map(x=>x.g+ET_GLIFO[x.calc(e)]).join(' ');
 const etapasTitulo=e=>ETAPAS.map(x=>x.t+': '+({true:'pass',false:'fail',null:'unmeasured'})[x.calc(e)]).join('\n')+'\n\n'+cgTitulo(e);
 function pintarArbol(){if($('tree').hidden||$('tree').style.display==='none')return;const q=$('buscar').value.trim().toLowerCase(),t=$('tree'),act=lamActual(),actMod=group?meta(group).modelo:null;t.innerHTML='';
  const passSet=new Set();
- NODOS.forEach(n=>{if((!q||n.e.lam.toLowerCase().includes(q))&&etapasOK(n.e)&&(!window.XPVIS||window.XPVIS.has(n.e.lam)))passSet.add(n.e.lam)});
+ NODOS.forEach(n=>{if((!q||segmentDisplayName(n.e).toLowerCase().includes(q))&&etapasOK(n.e)&&(!window.XPVIS||window.XPVIS.has(n.e.lam)))passSet.add(n.e.lam)});
  const evEl=$('etapasVisible');if(evEl)evEl.textContent=passSet.size+' of '+LAM.size+' laminae visible with this filter';
  const hay=n=>n.e.lam===act&&n.mod===actMod;let prim=true;
  ARB.forEach((sub,nom1)=>{
-  const pasa=n=>(!q||n.e.lam.toLowerCase().includes(q))&&(n.msk?true:etapasOK(n.e))&&(!window.XPVIS||window.XPVIS.has(n.e.lam));
+  const pasa=n=>(!q||segmentDisplayName(n.e).toLowerCase().includes(q))&&(n.msk?true:etapasOK(n.e))&&(!window.XPVIS||window.XPVIS.has(n.e.lam));
   const vis=[...sub].map(([b,ns])=>[b,ns.filter(pasa)]).filter(p=>p[1].length);
   if(!vis.length)return;
   const distintas=ns=>new Set(ns.map(n=>(n.e&&n.e.lam)||n.lam||n)).size;
   const tot=distintas(vis.flatMap(p=>p[1]));
   const d=document.createElement('details');d.open=!!q||prim||vis.some(p=>p[1].some(hay));prim=false;
-  const su=document.createElement('summary');su.textContent=nom1+' ('+tot+')';d.append(su);
+  const su=document.createElement('summary');su.textContent=(vistaModo==='malla'&&LAM.has(nom1)?segmentDisplayName(LAM.get(nom1)):nom1)+' ('+tot+')';d.append(su);
   vis.forEach(([nom2,ns])=>{let d2;
    if(nom2===''){d2=d}  /* vista por modelo: sin segundo nivel */
    else{d2=document.createElement('details');d2.open=!!q||ns.some(hay);
@@ -1353,15 +1359,18 @@ function pintarArbol(){if($('tree').hidden||$('tree').style.display==='none')ret
       setTimeout(()=>mskCargar(n.msk),400)};
      d2.append(b); return}
     const e=n.e,ct=(e.hojas||[e.lam]).some(h=>esContam(h,n.mod)),b=document.createElement('button');b.className='lam'+(hay(n)?' sel':'')+(ct?' contam':'');
-    b.textContent=(vistaModo==='malla'?(MODCORTO[n.mod]||n.mod)+' · '+(n.cara||''):e.lam);
+    b.textContent=(vistaModo==='malla'?(MODCORTO[n.mod]||n.mod)+' · '+(n.cara||''):segmentDisplayName(e));
+    if(vistaModo==='malla')b.title=segmentDisplayName(e);
     if(ct){b.title=CONTAM_TIT;const g=document.createElement('i');g.className='tag';g.textContent='TRAINING';b.append(g)}
     const s=document.createElement('small');
     const lg=LEG[e.lam], lgTxt=lg?('v5 '+lg.max.toFixed(3)+' @c'+lg.mejor_centro):'';
-    s.textContent=vistaModo==='pos'
+    s.textContent=window.VISOR_STATIC
+      ?[e.cm!=null?e.cm.toFixed(2)+' cm²':'',e.z].filter(Boolean).join(' · ')
+      :vistaModo==='pos'
       ?[e.cm!=null?e.cm.toFixed(2)+' cm²':'',lineaPos(e),lgTxt,etapasTxt(e)].filter(Boolean).join(' · ')
       :[e.cm!=null?e.cm.toFixed(2)+' cm²':'',e.est,cgTxt(e),e.z,lgTxt,etapasTxt(e)].filter(Boolean).join(' · ');
     if(lg)s.title=(s.title?s.title+'\n\n':'')+'Legibility index v5-R2B (EXPERIMENTAL): maximum '+lg.max.toFixed(3)+' over 512-px windows at centre '+lg.mejor_centro+'.\nIt is an UNCALIBRATED RANKING: it orders laminae, it does not claim there are letters.';
-    if(!ct)s.title=etapasTitulo(e);
+    if(!ct&&!window.VISOR_STATIC)s.title=etapasTitulo(e);
     if(vistaModo==='pos'&&!ct)b.title=tituloPos(e);
     if(s.textContent)b.append(s);
     b.onclick=()=>irA(e,n.mod);d2.append(b)};
@@ -2783,14 +2792,14 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
  const okFlag=(f,v)=>f===''||(f==='yes'?v:!v);
  function filtrar(rows){const q=F.q.trim().toLowerCase();return rows.filter(r=>{
   if(F.rollo&&r.rollo!==F.rollo)return false;
-  if(q&&!(r.hs.some(h=>h.toLowerCase().includes(q))||(r.e.fam||'').toLowerCase().includes(q)))return false;
+  if(q&&!(segmentDisplayName(r.e).toLowerCase().includes(q)||r.hs.some(h=>h.toLowerCase().includes(q))||(r.e.fam||'').toLowerCase().includes(q)))return false;
   if(!okTri(F.cert,r.cert)||!okTri(F.valid,r.valid)||!okTri(F.ct,r.ct)||!okTri(F.flat,r.flat)||!okTri(F.cont,r.cont)||!okTri(F.a4,r.a4))return false;
   if(F.amin!==''&&!(r.cm!=null&&r.cm>=+F.amin))return false;if(F.amax!==''&&!(r.cm!=null&&r.cm<=+F.amax))return false;
   if(F.v5min!==''&&!(r.v5!=null&&r.v5>=+F.v5min))return false;if(F.v5max!==''&&!(r.v5!=null&&r.v5<=+F.v5max))return false;if(F.isomax!==''&&!(r.iso!=null&&r.iso<=+F.isomax))return false;
   if(F.zmin!==''&&!(r.z!=null&&r.z>=+F.zmin))return false;if(F.zmax!==''&&!(r.z!=null&&r.z<=+F.zmax))return false;
   if(F.ctmin!==''&&!(r.ctp!=null&&r.ctp>=+F.ctmin))return false;if(F.c17&&r.nc<17)return false;
   if(!okFlag(F.rep,r.rep)||!okFlag(F.piece,r.piece)||!okFlag(F.lab,r.lab)||!okFlag(F.star,r.star))return false;if(F.unseen&&r.seen)return false;return true})}
- const ORD={sizescore:r=>(r.cm??0)*(r.v5??-1),area:r=>r.cm??-1,v5:r=>r.v5??-1,iso:r=>r.iso??1e9,z:r=>r.z??-1,name:r=>r.lam,ct:r=>r.ctp??-1};
+ const ORD={sizescore:r=>(r.cm??0)*(r.v5??-1),area:r=>r.cm??-1,v5:r=>r.v5??-1,iso:r=>r.iso??1e9,z:r=>r.z??-1,name:r=>segmentDisplayName(r.e),ct:r=>r.ctp??-1};
  function ordenar(rows){if(F.sort==='area_v5')return rows.sort((a,b)=>{for(const key of ['cm','v5']){const x=a[key],y=b[key],vx=Number.isFinite(x),vy=Number.isFinite(y);if(vx!==vy)return vx?-1:1;if(vx&&x!==y)return F.desc?y-x:x-y}return a.lam.localeCompare(b.lam)});const k=ORD[F.sort]||ORD.area;rows.sort((a,b)=>{const x=k(a),y=k(b);return typeof x==='string'?x.localeCompare(y):x-y});if(F.desc)rows.reverse();return rows}
  /* ---- presets: they SET the controls, nothing hidden ---- */
  const PRE=[['Submission',{cert:'pass',valid:'pass',ct:'pass',flat:'pass',cont:'pass',a4:'pass',sort:'area',desc:true},'All gates pass and area >= 4 cm2: the First Letters bar'],
@@ -2984,7 +2993,7 @@ let MASC=new Set();(globalThis.visorFetchData || fetch)('mascaras.json',{cache:'
   FLAT.slice(start,end).forEach(r=>{const rowKey=r.sub?'run:'+r.it.i:'segment:'+r.lam,cached=visibleRows.get(rowKey);
    if(cached){cached.classList.toggle('sel',r.sub?manifest[r.it.i]===group:r.lam===act);cached.classList.toggle('seen',!!(r.sub?r.r.seen:r.seen));frag.append(cached);nextRows.set(rowKey,cached);return}
    if(r.sub){const d=subFila(r);frag.append(d);nextRows.set(rowKey,d);return}const d=document.createElement('div');d.className='r'+(F.thumbs?' th':'')+(r.lam===act?' sel':'')+(r.seen?' seen':'');d.dataset.lam=r.lam;
-   d.innerHTML='<span class="star'+(r.star?' on':'')+'">★</span><span class="n" title="'+r.lam+(r.e.fam?' · '+r.e.fam:'')+(r.z!=null?' · z '+r.z:'')+(r.iso!=null?' · iso '+r.iso.toFixed(2)+' %':'')+(r.ctp!=null?' · CT '+r.ctp.toFixed(1)+' %':'')+(r.nc?' · '+r.nc+' centres':'')+(r.hs.length>1?' · laminae: '+r.hs.slice(1).join(', '):'')+'">'+'<span class="tg" title="show / hide its maps">'+(ABIERTAS.has(r.lam)?'▾':'▸')+r.e.items.length+'</span> '+(r.hs.some(h=>PROPS.has(h)||PROPS.has((typeof segId==='function')?segId(h):h))?'<span title="automatic mask proposal available: Label > import proposal">📋</span> ':'')+(r.hs.includes(OBJ)?'<span title="TARGET lamina">🎯</span> ':((x=>x!=null?'<span style="color:#f08a95" title="overlaps the target mesh '+EXCL[x]+' % - excluded from training">⊘</span> ':'')(r.hs.find(h=>EXCL[h]!=null))))+(r.rep?'<span style="color:#86dcd5">↻</span> ':'')+(r.lab?'<span style="color:#ffb347">✎</span> ':'')+r.lam+(r.hs.length>1?'<span class="lbl"> · '+r.hs[1]+(r.hs.length>2?' +'+(r.hs.length-2):'')+'</span>':'')+'</span>'+
+   d.innerHTML='<span class="star'+(r.star?' on':'')+'">★</span><span class="n" title="'+segmentDisplayName(r.e)+(r.e.fam?' · '+r.e.fam:'')+(r.z!=null?' · z '+r.z:'')+(r.iso!=null?' · iso '+r.iso.toFixed(2)+' %':'')+(r.ctp!=null?' · CT '+r.ctp.toFixed(1)+' %':'')+(r.nc?' · '+r.nc+' centres':'')+(r.hs.length>1?' · laminae: '+r.hs.slice(1).join(', '):'')+'">'+'<span class="tg" title="show / hide its maps">'+(ABIERTAS.has(r.lam)?'▾':'▸')+r.e.items.length+'</span> '+(r.hs.some(h=>PROPS.has(h)||PROPS.has((typeof segId==='function')?segId(h):h))?'<span title="automatic mask proposal available: Label > import proposal">📋</span> ':'')+(r.hs.includes(OBJ)?'<span title="TARGET lamina">🎯</span> ':((x=>x!=null?'<span style="color:#f08a95" title="overlaps the target mesh '+EXCL[x]+' % - excluded from training">⊘</span> ':'')(r.hs.find(h=>EXCL[h]!=null))))+(r.rep?'<span style="color:#86dcd5">↻</span> ':'')+(r.lab?'<span style="color:#ffb347">✎</span> ':'')+segmentDisplayName(r.e)+(r.hs.length>1?'<span class="lbl"> · '+r.hs[1]+(r.hs.length>2?' +'+(r.hs.length-2):'')+'</span>':'')+'</span>'+
     '<span class="num">'+(r.cm!=null?r.cm.toFixed(2):'—')+'</span><span class="num" title="v5 legibility'+(r.v5c!=null?' @c'+r.v5c:'')+(r.v5m?' · '+r.v5m:'')+(r.v5p!=null?' · p'+r.v5p.toFixed(1)+' within scroll and model':'')+'">'+(r.v5==null?'—':F.v5m==='pct'?'p'+r.v5p.toFixed(1):r.v5.toFixed(3))+'</span>'+marca(r);
    d.title=meshTooltip(r.e.items);d.querySelector('.n').title+='\n'+d.title;
    if(F.thumbs){const first=thumbDe(r),base=thumbDe(r,/base/i),thumbs=[first,...(base&&base.u!==first?.u?[base]:[])].filter(Boolean),box=document.createElement('div');box.className='thumbs';d.append(box);thumbs.forEach(t=>{if(t.u){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=modCorto(t.m)+' · c'+(+t.c>=0?'+':'')+t.c;figure.append(caption);box.append(figure);const im=document.createElement('img');im.className='th';im.alt=modCorto(t.m)+' preview';im.decoding='async';im.tabIndex=0;
